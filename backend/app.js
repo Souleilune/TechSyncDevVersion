@@ -28,6 +28,7 @@ const githubRoutes = require('./routes/github');
 const friendsRoutes = require('./routes/friends');
 const soloProjectRoutes = require('./routes/soloProjectRoutes');
 const awardsRoutes = require('./routes/awards');
+const userProfileUpdateRoutes = require('./routes/userProfileUpdate');
 
 // ✅ NEW: Import recommendations routes
 const recommendationsRoutes = require('./routes/recommendations');
@@ -151,6 +152,8 @@ app.use('/api/github', githubRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/solo-projects', soloProjectRoutes);
 app.use('/api/awards', awardsRoutes);
+app.use('/api/profile-update', userProfileUpdateRoutes);
+
 
 // ✅ NEW: Recommendations route
 app.use('/api/recommendations', recommendationsRoutes);

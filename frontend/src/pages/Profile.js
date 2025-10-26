@@ -4,7 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
 import { projectService } from '../services/projectService';
 import AwardsDisplay from '../components/AwardsDisplay';
-import { User, Settings, Shield, Calendar, Target, Users, Eye, EyeOff, SquarePen, Award, PanelLeft } from 'lucide-react';
+import EditLanguagesModal from '../components/EditLanguagesModal';
+import EditTopicsModal from '../components/EditTopicsModal';
+import { User, Settings, Shield, Calendar, Target, Users, Eye, EyeOff, SquarePen, Award, PanelLeft, Edit2 } from 'lucide-react';
 
 // Background symbols component with animations
 const BackgroundSymbols = () => (
@@ -115,6 +117,9 @@ function Profile() {
   // Awards state
   const [awardStats, setAwardStats] = useState(null);
   const [loadingAwards, setLoadingAwards] = useState(false);
+
+  const [showLanguagesModal, setShowLanguagesModal] = useState(false);
+  const [showTopicsModal, setShowTopicsModal] = useState(false);
 
   // Sidebar state - initialize from localStorage with lazy initialization
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -237,6 +242,19 @@ function Profile() {
       [section]: !prev[section]
     }));
   };
+
+  const handleUpdateProfile = async () => {
+  try {
+    // Refresh user data
+    const token = localStorage.getItem('token');
+    const response = await authService.getProfile(token);
+    if (response.success && response.data && response.data.user) {
+      await updateUser(response.data.user, true);
+    }
+  } catch (error) {
+    console.error('Error refreshing profile:', error);
+  }
+};
 
   const handleSaveProfile = async (section) => {
     try {
@@ -451,7 +469,17 @@ function Profile() {
             </div>
 
             <div style={styles.userInfoSection}>
-              <h4 style={styles.userInfoTitle}>Programming Languages</h4>
+              <div style={styles.sectionHeader}>
+                <h4 style={styles.userInfoTitle}>Programming Languages</h4>
+                <button
+                  style={styles.editButton}
+                  onClick={() => setShowLanguagesModal(true)}
+                  title="Edit programming languages"
+                >
+                  <Edit2 size={16} />
+                  Edit
+                </button>
+              </div>
               {user?.programming_languages && user.programming_languages.length > 0 ? (
                 <div style={styles.skillsContainer}>
                   {user.programming_languages.map(lang => (
@@ -467,7 +495,17 @@ function Profile() {
             </div>
 
             <div style={styles.userInfoSection}>
-              <h4 style={styles.userInfoTitle}>Areas of Interest</h4>
+              <div style={styles.sectionHeader}>
+                <h4 style={styles.userInfoTitle}>Areas of Interest</h4>
+                <button
+                  style={styles.editButton}
+                  onClick={() => setShowTopicsModal(true)}
+                  title="Edit areas of interest"
+                >
+                  <Edit2 size={16} />
+                  Edit
+                </button>
+              </div>
               {user?.topics && user.topics.length > 0 ? (
                 <div style={styles.skillsContainer}>
                   {user.topics.map(topic => (
@@ -856,6 +894,7 @@ function Profile() {
               </div>
             </div>
           </div>
+          
         </div>
 
         <style jsx>{`
@@ -880,7 +919,21 @@ function Profile() {
             }
           }
         `}</style>
-      </div>
+        {/* Edit Modals */}
+      <EditLanguagesModal
+        isOpen={showLanguagesModal}
+        onClose={() => setShowLanguagesModal(false)}
+        userLanguages={user?.programming_languages || []}
+        onUpdate={handleUpdateProfile}
+      />
+
+      <EditTopicsModal
+        isOpen={showTopicsModal}
+        onClose={() => setShowTopicsModal(false)}
+        userTopics={user?.topics || []}
+        onUpdate={handleUpdateProfile}
+      />
+     </div>
     </>
   );
 }
@@ -1262,7 +1315,31 @@ const styles = {
     padding: '40px 20px',
     fontSize: '14px',
     fontStyle: 'italic'
+  },
+  sectionHeader: {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: '12px'
+},
+editButton: {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '6px 12px',
+  backgroundColor: 'rgba(59, 130, 246, 0.15)',
+  border: '1px solid rgba(59, 130, 246, 0.3)',
+  borderRadius: '6px',
+  color: '#60a5fa',
+  fontSize: '13px',
+  fontWeight: '500',
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+  ':hover': {
+    backgroundColor: 'rgba(59, 130, 246, 0.25)',
+    borderColor: 'rgba(59, 130, 246, 0.5)'
   }
+}
 };
 
 export default Profile;
