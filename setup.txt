@@ -1,0 +1,234 @@
+# ================================================================
+# FRONTEND REPOSITORY - React
+# ================================================================
+
+# Create frontend project
+mkdir collaboration-platform-frontend
+cd collaboration-platform-frontend
+
+# Initialize React app
+npx create-react-app .
+
+# Install frontend dependencies for your stack
+npm install @supabase/supabase-js          # PostgreSQL via Supabase
+npm install react-router-dom               # Client-side routing
+npm install axios                          # HTTP client for REST API calls
+npm install @tailwindcss/forms            # Better form styling
+npm install lucide-react                  # Icons
+npm install @monaco-editor/react          # Code editor for coding challenges
+
+# Setup Tailwind CSS (optional but recommended)
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+
+# Additional packages for collaboration features
+npm install react-hot-toast              # User notifications
+npm install react-hook-form              # Form handling
+npm install @headlessui/react            # Accessible UI components
+npm install date-fns                     # Date utilities
+npm install socket.io-client             # Real-time chat client
+
+# Create environment file
+echo "# React App Configuration" > .env
+echo "REACT_APP_SUPABASE_URL=your_supabase_url" >> .env
+echo "REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key" >> .env
+echo "REACT_APP_API_URL=http://localhost:5000/api" >> .env
+
+# Setup Git
+git init
+echo "# React Frontend for Collaboration Platform" > README.md
+git add .
+git commit -m "Initial React frontend setup"
+
+# ================================================================
+# BACKEND REPOSITORY - Node.js + Express
+# ================================================================
+
+# Create backend project (in separate location)
+cd ..
+mkdir collaboration-platform-backend
+cd collaboration-platform-backend
+
+# Initialize Node.js project
+npm init -y
+
+# Install backend dependencies for your stack
+npm install express                        # Node.js web framework
+npm install @supabase/supabase-js         # PostgreSQL via Supabase
+npm install cors                          # Enable cross-origin requests
+npm install dotenv                        # Environment variables
+npm install helmet                        # Security middleware
+npm install express-rate-limit            # Rate limiting for REST API
+npm install jsonwebtoken                  # JWT for authentication
+npm install bcryptjs                      # Password hashing
+npm install joi                          # Input validation for REST API
+npm install google-generativeai          # Gemini API for project recommendations
+
+# Install development dependencies
+npm install -D nodemon                    # Auto-restart server
+
+# Additional packages for collaboration features
+npm install multer                        # File upload handling
+npm install express-validator            # Input validation
+npm install node-cron                    # Scheduled tasks (for recommendations)
+npm install socket.io                    # Real-time chat functionality
+
+# Create REST API structure
+mkdir routes middleware controllers utils config
+mkdir routes/api routes/auth routes/projects routes/challenges routes/users
+mkdir controllers utils config
+
+# Create main files
+touch app.js server.js
+
+# Create controllers
+touch controllers/authController.js
+touch controllers/projectController.js
+touch controllers/challengeController.js
+touch controllers/userController.js
+touch controllers/recommendationController.js
+
+# Create middleware
+touch middleware/auth.js
+touch middleware/validation.js
+touch middleware/errorHandler.js
+
+# Create utilities
+touch utils/skillMatching.js
+touch utils/geminiIntegration.js
+touch utils/codeEvaluator.js
+
+# Create configuration files
+touch config/supabase.js
+touch config/gemini.js
+touch config/database.js
+
+# Create route files
+touch routes/auth.js
+touch routes/projects.js
+touch routes/challenges.js
+touch routes/users.js
+touch routes/recommendations.js
+
+# Create environment file
+echo "# Server Configuration" > .env
+echo "PORT=5000" >> .env
+echo "NODE_ENV=development" >> .env
+echo "" >> .env
+echo "# Supabase PostgreSQL Configuration" >> .env
+echo "SUPABASE_URL=your_supabase_url" >> .env
+echo "SUPABASE_ANON_KEY=your_supabase_anon_key" >> .env
+echo "SUPABASE_SERVICE_KEY=your_supabase_service_key" >> .env
+echo "" >> .env
+echo "# Gemini AI Configuration" >> .env
+echo "GEMINI_API_KEY=your_gemini_api_key" >> .env
+echo "" >> .env
+echo "# Authentication" >> .env
+echo "JWT_SECRET=your_jwt_secret_here" >> .env
+echo "JWT_EXPIRE=7d" >> .env
+echo "" >> .env
+echo "# CORS Configuration" >> .env
+echo "FRONTEND_URL=http://localhost:3000" >> .env
+
+# Create .gitignore
+echo "node_modules/" > .gitignore
+echo ".env" >> .gitignore
+echo "dist/" >> .gitignore
+echo ".DS_Store" >> .gitignore
+echo "logs/" >> .gitignore
+echo "*.log" >> .gitignore
+
+# Update package.json scripts
+npm pkg set scripts.start="node server.js"
+npm pkg set scripts.dev="nodemon server.js"
+npm pkg set scripts.test="echo \"Error: no test specified\" && exit 1"
+
+# Setup Git
+git init
+echo "# Node.js Backend for Collaboration Platform" > README.md
+git add .
+git commit -m "Initial Node.js backend setup with Express and Supabase"
+
+# ================================================================
+# DEVELOPMENT WORKFLOW
+# ================================================================
+
+# Frontend Development (Terminal 1)
+cd collaboration-platform-frontend
+npm start
+# Runs on http://localhost:3000
+
+# Backend Development (Terminal 2)
+cd collaboration-platform-backend
+npm run dev
+# Runs on http://localhost:5000
+
+# ================================================================
+# PROJECT STRUCTURE OVERVIEW
+# ================================================================
+
+# Frontend Structure:
+# collaboration-platform-frontend/
+# ├── src/
+# │   ├── components/
+# │   ├── pages/
+# │   ├── hooks/
+# │   ├── utils/
+# │   ├── services/        # API calls to backend
+# │   └── contexts/        # React contexts
+# ├── public/
+# └── package.json
+
+# Backend Structure:
+# collaboration-platform-backend/
+# ├── routes/              # REST API endpoints
+# ├── controllers/         # Business logic
+# ├── middleware/          # Express middleware
+# ├── utils/               # Utility functions (skill matching, etc.)
+# ├── config/              # Configuration files
+# ├── app.js               # Express app setup
+# ├── server.js            # Server entry point
+# └── package.json
+
+# ================================================================
+# USEFUL COMMANDS FOR DEVELOPMENT
+# ================================================================
+
+# Add new packages
+# Frontend: cd collaboration-platform-frontend && npm install package-name
+# Backend: cd collaboration-platform-backend && npm install package-name
+
+# Check running processes
+# lsof -i :3000  # Check what's running on port 3000 (React)
+# lsof -i :5000  # Check what's running on port 5000 (Express)
+
+# Kill processes if needed
+# kill -9 $(lsof -ti:3000)
+# kill -9 $(lsof -ti:5000)
+
+# Environment setup reminder
+# 1. Get Supabase credentials from your Supabase dashboard
+# 2. Get Gemini API key from Google AI Studio
+# 3. Generate JWT secret: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# 4. Update .env files with actual values
+
+# ================================================================
+# DEPLOYMENT CONSIDERATIONS
+# ================================================================
+
+# Frontend deployment options:
+# - Vercel (recommended for React)
+# - Netlify
+# - AWS S3 + CloudFront
+
+# Backend deployment options:
+# - Railway
+# - Render
+# - AWS EC2 + Load Balancer
+# - Google Cloud Run
+
+# Remember to:
+# - Set production environment variables
+# - Update CORS origins for production
+# - Set up CI/CD pipelines
+# - Configure domain and SSL certificates

@@ -1,0 +1,15 @@
+Metric,20 Users,50 Users,100 Users
+"Users Tested",20,50,100
+"Total Recommendations",32,62,151
+"Users with Recommendations",6,24,53
+"Success Rate (%)",30.0,48.0,53.0
+"Avg Recommendations/User",1.60,1.24,1.51
+"Average Score",63.38,60.95,61.34
+"Min Score",56,56,56
+"Max Score",72,68,72
+"Execution Time (s)",38.80,90.85,186.40
+"Time per User (s)",1.940,1.817,1.864
+"Perfect Matches (≥90)",0,0,0
+"Good Matches (≥75)",0,0,0
+"Acceptable Matches (≥55)",32,62,151
+"No Matches",14,26,47

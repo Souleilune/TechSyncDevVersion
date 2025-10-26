@@ -1,0 +1,1602 @@
+{
+  "tests": [
+    {
+      "sampleSize": 20,
+      "usersTested": 20,
+      "totalRecommendations": 32,
+      "successfulRecommendations": 6,
+      "averageScore": 63.375,
+      "averageRecommendationsPerUser": 1.6,
+      "minScore": 56,
+      "maxScore": 72,
+      "executionTime": 38.805,
+      "scoreDistribution": {
+        "excellent (90-100)": 0,
+        "good (75-89)": 0,
+        "acceptable (55-74)": 32,
+        "below_threshold (<55)": 0
+      },
+      "matchQualityMetrics": {
+        "perfectMatches": 0,
+        "goodMatches": 0,
+        "acceptableMatches": 32,
+        "noMatches": 14
+      },
+      "userDetails": [
+        {
+          "userId": "e58fb231-9de7-44e9-ad9a-4e9aafa5d53e",
+          "email": "testing0123@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            64,
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "c3ab7a25-d0f9-4c05-8b7c-fdca434ef199",
+          "email": "thekraken16@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "014c4b3d-6dd6-4fff-a89b-c19bd29039d7",
+          "email": "ejalpas25@gmail.com",
+          "recommendationCount": 6,
+          "scores": [
+            68,
+            66,
+            57,
+            60,
+            68,
+            59
+          ],
+          "avgScore": 63
+        },
+        {
+          "userId": "9ec89c14-d20a-4b1b-bdf8-f79cedb4ea89",
+          "email": "account8@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "8b09a6cd-0690-4460-8fd8-f25ae42cc67e",
+          "email": "ross@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "c1bb6acd-98d4-4126-9aa6-b8fa731cff07",
+          "email": "kjmorales@gmail.com",
+          "recommendationCount": 9,
+          "scores": [
+            72,
+            68,
+            68,
+            61,
+            66,
+            56,
+            68,
+            56,
+            61
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "5f428be5-d8da-4604-879b-21b900d68002",
+          "email": "nakamaph21@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "08807221-9e6f-4bae-bc60-1cb8f0b3a0dd",
+          "email": "alfredoisamis001@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "22948661-68a2-46dd-9e41-aaf8b7f411a2",
+          "email": "iandelacruz@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "2299dde4-fa28-4bc3-bf83-f0e33017333f",
+          "email": "theironman31@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "83bcc3e1-2f9b-46a7-94df-85a00178226e",
+          "email": "account4@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "910f79fe-3b67-4500-96a7-9ef4e5afcf78",
+          "email": "tesst@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "634bc021-7862-4774-8a97-c4dc7d57681c",
+          "email": "ciana@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "87a5e8eb-1635-4fe3-8ebb-365fbc0d46c0",
+          "email": "lesternobleza@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "a5349c28-6489-48cc-aa98-e01a2f33642b",
+          "email": "account9@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "cae2e76a-1d1b-4e06-b139-9949e4de1882",
+          "email": "accountthree@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "de706de2-30c9-44bb-8365-b121b84f0619",
+          "email": "khelileto26@gmail.com",
+          "recommendationCount": 6,
+          "scores": [
+            68,
+            59,
+            56,
+            59,
+            57,
+            68
+          ],
+          "avgScore": 61.166666666666664
+        },
+        {
+          "userId": "018731ac-2a3e-4940-b8fb-8f9582efe2c8",
+          "email": "dale@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            58
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "9e123f27-7298-4cb4-a651-0ba21769515d",
+          "email": "laurencealsong@gmail.com",
+          "recommendationCount": 7,
+          "scores": [
+            68,
+            68,
+            68,
+            59,
+            62,
+            68,
+            64
+          ],
+          "avgScore": 65.28571428571429
+        },
+        {
+          "userId": "0a3c0c21-9a90-419d-b7b3-4d47be9576fa",
+          "email": "chippymcdo@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        }
+      ]
+    },
+    {
+      "sampleSize": 50,
+      "usersTested": 50,
+      "totalRecommendations": 62,
+      "successfulRecommendations": 24,
+      "averageScore": 60.95161290322581,
+      "averageRecommendationsPerUser": 1.24,
+      "minScore": 56,
+      "maxScore": 68,
+      "executionTime": 90.846,
+      "scoreDistribution": {
+        "excellent (90-100)": 0,
+        "good (75-89)": 0,
+        "acceptable (55-74)": 62,
+        "below_threshold (<55)": 0
+      },
+      "matchQualityMetrics": {
+        "perfectMatches": 0,
+        "goodMatches": 0,
+        "acceptableMatches": 62,
+        "noMatches": 26
+      },
+      "userDetails": [
+        {
+          "userId": "6016e862-a4e3-4788-8cb2-677b0e5d2e78",
+          "email": "deguzmanrizza21@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "4182a1fd-95e3-4776-8733-7656df26f68c",
+          "email": "dandrebmendiola11@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            59,
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "9cfcfecc-fcf9-4d2c-b84d-e6fe7f3e113c",
+          "email": "account6@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            57,
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "affacb17-a9e6-4761-b99f-0969f8694314",
+          "email": "esst@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            64,
+            59
+          ],
+          "avgScore": 61.5
+        },
+        {
+          "userId": "6654d0d9-b22f-4d11-acf3-56bdb0358758",
+          "email": "sheenaaromin20@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "61fbb8c1-528b-4d17-ab33-bdc7d1a91086",
+          "email": "rrodriguez314@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "8b09a6cd-0690-4460-8fd8-f25ae42cc67e",
+          "email": "ross@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "5cd21e4b-a539-4e40-8207-a7f577f228c6",
+          "email": "jinky_alolino456@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "3aa85360-b58f-4ca9-951e-7137f5cccd8d",
+          "email": "owen@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            59,
+            57
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "d1809893-683e-4b36-991b-508848c6ca8e",
+          "email": "carmillaleonor421@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "87a5e8eb-1635-4fe3-8ebb-365fbc0d46c0",
+          "email": "lesternobleza@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "1f183878-cd99-44d0-8fed-9dcccc95b06a",
+          "email": "aaarsona2001@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            59,
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "e39de76f-ff95-4b34-bb9b-1de8182a44c2",
+          "email": "ftempura016@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "60a0ded6-9a21-443c-8e39-88be53ea05bd",
+          "email": "caldojenny01@gmail.com",
+          "recommendationCount": 4,
+          "scores": [
+            59,
+            57,
+            59,
+            57
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "069505ca-1e5e-4fbb-9aac-647301c6954c",
+          "email": "ladignonevan21@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "0a3c0c21-9a90-419d-b7b3-4d47be9576fa",
+          "email": "chippymcdo@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "d930438a-1441-448c-ad09-d77b65bbba0f",
+          "email": "decastro_arnolds11@gmail.com",
+          "recommendationCount": 4,
+          "scores": [
+            59,
+            59,
+            59,
+            56
+          ],
+          "avgScore": 58.25
+        },
+        {
+          "userId": "7975c5dd-7457-4809-ba38-e00582b24c80",
+          "email": "magtanggolchristian111@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "abe8bc12-e11a-4535-9dd5-eb8b2234f676",
+          "email": "cjpar14@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "0dedfce4-02ff-4e90-b8bb-51fa281ffdb0",
+          "email": "dobligacion1738@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "b9f15a18-edf1-4ada-9502-0cfffb604f8c",
+          "email": "tiu@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "b4136709-86b5-4e6e-af50-0c6e074134c7",
+          "email": "johndoe@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "0c363cfa-a233-40ae-8e23-3a89cc6dee01",
+          "email": "echo_maniquis321@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "42d29cb5-2458-40dd-8ae8-2fedddae2d1c",
+          "email": "johnhenrickgo@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "9e123f27-7298-4cb4-a651-0ba21769515d",
+          "email": "laurencealsong@gmail.com",
+          "recommendationCount": 7,
+          "scores": [
+            68,
+            68,
+            68,
+            59,
+            62,
+            68,
+            64
+          ],
+          "avgScore": 65.28571428571429
+        },
+        {
+          "userId": "b6365b16-b523-4a7d-83ae-f44b4b212408",
+          "email": "ryanalonte38@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            57,
+            56
+          ],
+          "avgScore": 56.5
+        },
+        {
+          "userId": "e0b28f77-b76e-4064-8bc2-39af36bb0ba8",
+          "email": "vaughnramoz@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            64,
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "76193862-f14b-45e6-957d-345dbd004869",
+          "email": "juls123@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "d32b62b4-06fa-4262-bd18-e22eaa63399a",
+          "email": "franzelleherradura@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "9f5ec983-f164-4ed5-b7d4-3dc578d7dc32",
+          "email": "jiromarcelo012@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            56
+          ],
+          "avgScore": 56
+        },
+        {
+          "userId": "9207be88-6bfb-4cbc-8dea-46f72b5d6474",
+          "email": "regataaizel29@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "634bc021-7862-4774-8a97-c4dc7d57681c",
+          "email": "ciana@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "8bad200c-8212-4a5f-b9b1-1dde40f4d7a9",
+          "email": "russelben11@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "e2d2e2bc-87dd-44a6-9b27-dd928fbefd41",
+          "email": "pantoja.angel2004@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "6a4dd823-8cdd-43d8-b100-7234c48792c9",
+          "email": "jamesbond312@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "063e62fd-1e8a-4b63-a703-73099c50f455",
+          "email": "anitamaxwyn@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            64,
+            64,
+            57
+          ],
+          "avgScore": 61.666666666666664
+        },
+        {
+          "userId": "417d6f00-bda2-4fa0-b88c-27e579fd7c9d",
+          "email": "lorenzmagna@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "061b6438-f4da-436f-96c7-16f81e4ca268",
+          "email": "rjnova12@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "c12142ab-6a17-40cc-9852-bc00f913d5a1",
+          "email": "francisco_jane12@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "de706de2-30c9-44bb-8365-b121b84f0619",
+          "email": "khelileto26@gmail.com",
+          "recommendationCount": 6,
+          "scores": [
+            68,
+            59,
+            56,
+            59,
+            57,
+            68
+          ],
+          "avgScore": 61.166666666666664
+        },
+        {
+          "userId": "aa042b0c-61ca-49e8-a826-1e78ed871ede",
+          "email": "testing01@gmail.com",
+          "recommendationCount": 4,
+          "scores": [
+            64,
+            64,
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "95165090-973b-4a4a-a64c-08663a9fbf91",
+          "email": "cedymagbanua39@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            57,
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "8931129d-7002-46c4-adfc-67d727423954",
+          "email": "lisingjett17@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "181fd39e-203b-4eb5-8648-179ff63970b5",
+          "email": "juliousmiguelquintas@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            58
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "e865bf65-a727-460a-8d7d-28695ccbfaaf",
+          "email": "piattosmarygrace@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            68,
+            61,
+            59
+          ],
+          "avgScore": 62.666666666666664
+        },
+        {
+          "userId": "9ec89c14-d20a-4b1b-bdf8-f79cedb4ea89",
+          "email": "account8@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "2c92ca04-dfe3-43c4-b3b9-4fd700ed2068",
+          "email": "khristianangelotiu@gmail.com",
+          "recommendationCount": 5,
+          "scores": [
+            64,
+            64,
+            64,
+            59,
+            64
+          ],
+          "avgScore": 63
+        },
+        {
+          "userId": "603462a8-bcac-408a-bdce-8c9f489cfcec",
+          "email": "account7@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "704df0e4-d121-40e1-879b-f4a063edc541",
+          "email": "espantojohnny12@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "e5a16956-09cb-4985-b0c6-9fa3158334eb",
+          "email": "jbledesma10@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        }
+      ]
+    },
+    {
+      "sampleSize": 100,
+      "usersTested": 100,
+      "totalRecommendations": 151,
+      "successfulRecommendations": 53,
+      "averageScore": 61.34437086092715,
+      "averageRecommendationsPerUser": 1.51,
+      "minScore": 56,
+      "maxScore": 72,
+      "executionTime": 186.401,
+      "scoreDistribution": {
+        "excellent (90-100)": 0,
+        "good (75-89)": 0,
+        "acceptable (55-74)": 151,
+        "below_threshold (<55)": 0
+      },
+      "matchQualityMetrics": {
+        "perfectMatches": 0,
+        "goodMatches": 0,
+        "acceptableMatches": 151,
+        "noMatches": 47
+      },
+      "userDetails": [
+        {
+          "userId": "696b3148-c686-49bc-8fe5-136cbc5a22ce",
+          "email": "madelafuente221@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "09eaedda-e213-4638-b6af-996b8308f92f",
+          "email": "virgildelacruz15@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "83bcc3e1-2f9b-46a7-94df-85a00178226e",
+          "email": "account4@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "affacb17-a9e6-4761-b99f-0969f8694314",
+          "email": "esst@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            64,
+            59
+          ],
+          "avgScore": 61.5
+        },
+        {
+          "userId": "42d29cb5-2458-40dd-8ae8-2fedddae2d1c",
+          "email": "johnhenrickgo@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "014c4b3d-6dd6-4fff-a89b-c19bd29039d7",
+          "email": "ejalpas25@gmail.com",
+          "recommendationCount": 6,
+          "scores": [
+            68,
+            66,
+            57,
+            60,
+            68,
+            59
+          ],
+          "avgScore": 63
+        },
+        {
+          "userId": "31e71c1f-040e-4249-bb48-3a8dceeaafc2",
+          "email": "test@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "7f78532b-ee45-4833-a932-4cbc76aa6559",
+          "email": "jhoanaalico@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "aa042b0c-61ca-49e8-a826-1e78ed871ede",
+          "email": "testing01@gmail.com",
+          "recommendationCount": 4,
+          "scores": [
+            64,
+            64,
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "8b09a6cd-0690-4460-8fd8-f25ae42cc67e",
+          "email": "ross@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "57875ac8-7954-431d-8aca-fee323aec1ce",
+          "email": "account5@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "a5349c28-6489-48cc-aa98-e01a2f33642b",
+          "email": "account9@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "9cfcfecc-fcf9-4d2c-b84d-e6fe7f3e113c",
+          "email": "account6@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            57,
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "d32b62b4-06fa-4262-bd18-e22eaa63399a",
+          "email": "franzelleherradura@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "5f428be5-d8da-4604-879b-21b900d68002",
+          "email": "nakamaph21@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "08807221-9e6f-4bae-bc60-1cb8f0b3a0dd",
+          "email": "alfredoisamis001@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "97de8464-dbfc-4377-a403-a4ee9fda8cf5",
+          "email": "bernardocampo222@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "98a46e3d-41b3-4cee-82cb-102d922278bd",
+          "email": "jonlhenare@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            60,
+            60
+          ],
+          "avgScore": 60
+        },
+        {
+          "userId": "061b6438-f4da-436f-96c7-16f81e4ca268",
+          "email": "rjnova12@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "c4e1607e-ea3f-4ebb-bed5-82f70631047b",
+          "email": "khristiangabrieltiu@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "c3ab7a25-d0f9-4c05-8b7c-fdca434ef199",
+          "email": "thekraken16@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "f0ecf24f-6e48-4fb2-b9bf-9ef5db771f39",
+          "email": "anasariasalvin62@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "069505ca-1e5e-4fbb-9aac-647301c6954c",
+          "email": "ladignonevan21@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "e5a16956-09cb-4985-b0c6-9fa3158334eb",
+          "email": "jbledesma10@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "feea0353-cd1b-4b70-8955-5e819d6d8d8e",
+          "email": "jaromirnovak312@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "c1bb6acd-98d4-4126-9aa6-b8fa731cff07",
+          "email": "kjmorales@gmail.com",
+          "recommendationCount": 9,
+          "scores": [
+            72,
+            68,
+            68,
+            61,
+            66,
+            56,
+            68,
+            56,
+            61
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "1369a9e3-c8e4-489c-8d11-5b09e9963a43",
+          "email": "jmarcelino102@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "a5ec3c15-9f86-4deb-9f5a-145515a698ac",
+          "email": "kingandreinaceno@gmail.com",
+          "recommendationCount": 7,
+          "scores": [
+            64,
+            64,
+            57,
+            64,
+            58,
+            64,
+            57
+          ],
+          "avgScore": 61.142857142857146
+        },
+        {
+          "userId": "14d459a0-cede-48d1-986c-c7589ef921c8",
+          "email": "test123@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            56
+          ],
+          "avgScore": 56
+        },
+        {
+          "userId": "603462a8-bcac-408a-bdce-8c9f489cfcec",
+          "email": "account7@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "d1809893-683e-4b36-991b-508848c6ca8e",
+          "email": "carmillaleonor421@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "1dcd9f12-8dbf-4932-a205-c5f6423fc4e2",
+          "email": "accounttwo@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "9e123f27-7298-4cb4-a651-0ba21769515d",
+          "email": "laurencealsong@gmail.com",
+          "recommendationCount": 7,
+          "scores": [
+            68,
+            68,
+            68,
+            59,
+            62,
+            68,
+            64
+          ],
+          "avgScore": 65.28571428571429
+        },
+        {
+          "userId": "910f79fe-3b67-4500-96a7-9ef4e5afcf78",
+          "email": "tesst@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "b6365b16-b523-4a7d-83ae-f44b4b212408",
+          "email": "ryanalonte38@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            57,
+            56
+          ],
+          "avgScore": 56.5
+        },
+        {
+          "userId": "9207be88-6bfb-4cbc-8dea-46f72b5d6474",
+          "email": "regataaizel29@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "4182a1fd-95e3-4776-8733-7656df26f68c",
+          "email": "dandrebmendiola11@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            59,
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "cae2e76a-1d1b-4e06-b139-9949e4de1882",
+          "email": "accountthree@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "6a4dd823-8cdd-43d8-b100-7234c48792c9",
+          "email": "jamesbond312@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "633721cd-5a3f-440a-8655-3e401710dca8",
+          "email": "programmerk@gmail.com",
+          "recommendationCount": 10,
+          "scores": [
+            64,
+            64,
+            64,
+            64,
+            64,
+            64,
+            64,
+            64,
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "8931129d-7002-46c4-adfc-67d727423954",
+          "email": "lisingjett17@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "abe8bc12-e11a-4535-9dd5-eb8b2234f676",
+          "email": "cjpar14@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "f364a85d-f8fc-4a5f-80fa-0fce8ff2bc5c",
+          "email": "icasuco31@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            63,
+            56
+          ],
+          "avgScore": 59.5
+        },
+        {
+          "userId": "b6a917ad-6855-41a8-b810-0bb834b2fac1",
+          "email": "jmasistores22@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            68
+          ],
+          "avgScore": 68
+        },
+        {
+          "userId": "6a235a09-6b5c-4a02-8d93-0411ca6e25cb",
+          "email": "tydex26@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            58
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "73c5d6b1-778b-4a2b-926b-9ef8ac67cf4a",
+          "email": "programmerc@gmail.com",
+          "recommendationCount": 10,
+          "scores": [
+            60,
+            58,
+            58,
+            58,
+            58,
+            58,
+            58,
+            58,
+            58,
+            58
+          ],
+          "avgScore": 58.2
+        },
+        {
+          "userId": "634bc021-7862-4774-8a97-c4dc7d57681c",
+          "email": "ciana@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "88a88476-b3cb-4ff9-b537-9f5f74217b88",
+          "email": "evangelistaluis141@gmail.com",
+          "recommendationCount": 4,
+          "scores": [
+            68,
+            59,
+            62,
+            59
+          ],
+          "avgScore": 62
+        },
+        {
+          "userId": "5cd21e4b-a539-4e40-8207-a7f577f228c6",
+          "email": "jinky_alolino456@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "d0043440-a313-427c-a58a-024e215be704",
+          "email": "rbalolong251@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "95165090-973b-4a4a-a64c-08663a9fbf91",
+          "email": "cedymagbanua39@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            57,
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "c12142ab-6a17-40cc-9852-bc00f913d5a1",
+          "email": "francisco_jane12@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "5c7da243-6c8d-458b-9aa4-c44eca3ebd10",
+          "email": "araque@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "0a3c0c21-9a90-419d-b7b3-4d47be9576fa",
+          "email": "chippymcdo@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "37306d6f-4899-4d9c-87d8-8a461e13ef42",
+          "email": "harolddiaz1@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "7975c5dd-7457-4809-ba38-e00582b24c80",
+          "email": "magtanggolchristian111@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "063e62fd-1e8a-4b63-a703-73099c50f455",
+          "email": "anitamaxwyn@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            64,
+            64,
+            57
+          ],
+          "avgScore": 61.666666666666664
+        },
+        {
+          "userId": "3b693eff-c9db-4d0d-badc-e3d51f48c261",
+          "email": "oishi_cm21@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            68
+          ],
+          "avgScore": 68
+        },
+        {
+          "userId": "fd42b285-e710-4d44-9ba4-dc51f2eeba58",
+          "email": "jaja@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "e2d2e2bc-87dd-44a6-9b27-dd928fbefd41",
+          "email": "pantoja.angel2004@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            57
+          ],
+          "avgScore": 57
+        },
+        {
+          "userId": "b4136709-86b5-4e6e-af50-0c6e074134c7",
+          "email": "johndoe@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "9ec89c14-d20a-4b1b-bdf8-f79cedb4ea89",
+          "email": "account8@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "f11542db-ab75-46aa-8d49-0ce7bd68c05b",
+          "email": "cedyced@gmail.com",
+          "recommendationCount": 5,
+          "scores": [
+            68,
+            64,
+            58,
+            58,
+            58
+          ],
+          "avgScore": 61.2
+        },
+        {
+          "userId": "de706de2-30c9-44bb-8365-b121b84f0619",
+          "email": "khelileto26@gmail.com",
+          "recommendationCount": 6,
+          "scores": [
+            68,
+            59,
+            56,
+            59,
+            57,
+            68
+          ],
+          "avgScore": 61.166666666666664
+        },
+        {
+          "userId": "2299dde4-fa28-4bc3-bf83-f0e33017333f",
+          "email": "theironman31@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "79c9a544-3ee3-49ec-83f9-2ae340575f95",
+          "email": "accountone@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "6016e862-a4e3-4788-8cb2-677b0e5d2e78",
+          "email": "deguzmanrizza21@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "e998155f-aaed-4382-878f-d4ff349c0472",
+          "email": "testing@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            72
+          ],
+          "avgScore": 72
+        },
+        {
+          "userId": "f50d6ec4-a8ba-4057-8c54-1b9ad5b50ccb",
+          "email": "vincego21@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            59,
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "417d6f00-bda2-4fa0-b88c-27e579fd7c9d",
+          "email": "lorenzmagna@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "8a9f9aa1-ffda-4a93-8fa8-5e7942110603",
+          "email": "avosotros456@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            68,
+            59
+          ],
+          "avgScore": 63.5
+        },
+        {
+          "userId": "e58fb231-9de7-44e9-ad9a-4e9aafa5d53e",
+          "email": "testing0123@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            64,
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "181fd39e-203b-4eb5-8648-179ff63970b5",
+          "email": "juliousmiguelquintas@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            58
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "e39de76f-ff95-4b34-bb9b-1de8182a44c2",
+          "email": "ftempura016@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "3aa85360-b58f-4ca9-951e-7137f5cccd8d",
+          "email": "owen@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            59,
+            57
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "60a0ded6-9a21-443c-8e39-88be53ea05bd",
+          "email": "caldojenny01@gmail.com",
+          "recommendationCount": 4,
+          "scores": [
+            59,
+            57,
+            59,
+            57
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "6654d0d9-b22f-4d11-acf3-56bdb0358758",
+          "email": "sheenaaromin20@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "61fbb8c1-528b-4d17-ab33-bdc7d1a91086",
+          "email": "rrodriguez314@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "9f5ec983-f164-4ed5-b7d4-3dc578d7dc32",
+          "email": "jiromarcelo012@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            56
+          ],
+          "avgScore": 56
+        },
+        {
+          "userId": "d930438a-1441-448c-ad09-d77b65bbba0f",
+          "email": "decastro_arnolds11@gmail.com",
+          "recommendationCount": 4,
+          "scores": [
+            59,
+            59,
+            59,
+            56
+          ],
+          "avgScore": 58.25
+        },
+        {
+          "userId": "e0b28f77-b76e-4064-8bc2-39af36bb0ba8",
+          "email": "vaughnramoz@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            64,
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "eee3d3e9-a927-401c-922b-4a444550ef40",
+          "email": "kymallari001@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            58
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "0c363cfa-a233-40ae-8e23-3a89cc6dee01",
+          "email": "echo_maniquis321@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "87a5e8eb-1635-4fe3-8ebb-365fbc0d46c0",
+          "email": "lesternobleza@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "018731ac-2a3e-4940-b8fb-8f9582efe2c8",
+          "email": "dale@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            58
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "2c92ca04-dfe3-43c4-b3b9-4fd700ed2068",
+          "email": "khristianangelotiu@gmail.com",
+          "recommendationCount": 5,
+          "scores": [
+            64,
+            64,
+            64,
+            59,
+            64
+          ],
+          "avgScore": 63
+        },
+        {
+          "userId": "1f183878-cd99-44d0-8fed-9dcccc95b06a",
+          "email": "aaarsona2001@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            59,
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "22948661-68a2-46dd-9e41-aaf8b7f411a2",
+          "email": "iandelacruz@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "76193862-f14b-45e6-957d-345dbd004869",
+          "email": "juls123@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            64,
+            64
+          ],
+          "avgScore": 64
+        },
+        {
+          "userId": "0dedfce4-02ff-4e90-b8bb-51fa281ffdb0",
+          "email": "dobligacion1738@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "0d9f3f0d-d0cf-45bd-bc08-271897f986e7",
+          "email": "xiaomi8@gmail.com",
+          "recommendationCount": 2,
+          "scores": [
+            59,
+            58
+          ],
+          "avgScore": 58.5
+        },
+        {
+          "userId": "cdf7807c-2281-4735-bd34-1b9b3b944d9a",
+          "email": "skaipogi123@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            58
+          ],
+          "avgScore": 58
+        },
+        {
+          "userId": "b9f15a18-edf1-4ada-9502-0cfffb604f8c",
+          "email": "tiu@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "704df0e4-d121-40e1-879b-f4a063edc541",
+          "email": "espantojohnny12@gmail.com",
+          "recommendationCount": 1,
+          "scores": [
+            59
+          ],
+          "avgScore": 59
+        },
+        {
+          "userId": "e865bf65-a727-460a-8d7d-28695ccbfaaf",
+          "email": "piattosmarygrace@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            68,
+            61,
+            59
+          ],
+          "avgScore": 62.666666666666664
+        },
+        {
+          "userId": "b5cf6cd0-37e2-4d03-8850-b0defeb2c1bb",
+          "email": "jcalderon92@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "bbfe0738-9df3-430e-9bd1-dce44d27102e",
+          "email": "princerenalde111@gmail.com",
+          "recommendationCount": 3,
+          "scores": [
+            66,
+            60,
+            57
+          ],
+          "avgScore": 61
+        },
+        {
+          "userId": "636d9cc0-f75a-4785-93cc-22f122867ed0",
+          "email": "daryllsagaya@gmail.com",
+          "recommendationCount": 7,
+          "scores": [
+            64,
+            64,
+            64,
+            57,
+            57,
+            64,
+            57
+          ],
+          "avgScore": 61
+        },
+        {
+          "userId": "8bad200c-8212-4a5f-b9b1-1dde40f4d7a9",
+          "email": "russelben11@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        },
+        {
+          "userId": "873b9348-ae0b-460a-bfb4-4a08915ac151",
+          "email": "florezelyas41@gmail.com",
+          "recommendationCount": 0,
+          "scores": [],
+          "avgScore": 0
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalTests": 3,
+    "comparison": {}
+  },
+  "timestamp": "2025-10-26T07:12:57.817Z"
+}
