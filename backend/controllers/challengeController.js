@@ -566,30 +566,92 @@ const submitSimpleChallenge = async (req, res) => {
     }
 
     // Run tests if test cases exist
-    let score = 50;
-    let status = 'pending';
-    let feedback = 'Your submission has been received and is being evaluated.';
-    let testResults = null;
+    // Run tests if test cases exist
+let score = 50;
+let status = 'pending';
+let feedback = 'Your submission has been received and is being evaluated.';
+let testResults = null;
 
-    if (challenge.test_cases && Array.isArray(challenge.test_cases)) {
+// Check if challenge has test cases
+if (challenge.test_cases) {
+  try {
+    // Parse test_cases if it's a string
+    let parsedTestCases = challenge.test_cases;
+    if (typeof challenge.test_cases === 'string') {
       try {
-        const evalResult = await runTests(
-          submitted_code,
-          challenge.test_cases,
-          language || challenge.programming_languages?.name?.toLowerCase() || 'javascript'
-        );
-
-        score = evalResult.score || 0;
-        status = score >= 60 ? 'passed' : 'failed';
-        testResults = evalResult.results;
-        feedback = evalResult.feedback || `Score: ${score}%. ${status === 'passed' ? 'Great job!' : 'Keep practicing!'}`;
-      } catch (evalError) {
-        console.error('Code evaluation error:', evalError);
-        score = 0;
-        status = 'failed';
-        feedback = 'Error evaluating your code. Please check your syntax and try again.';
+        parsedTestCases = JSON.parse(challenge.test_cases);
+      } catch (parseError) {
+        console.warn('Failed to parse test_cases JSON:', parseError);
+        parsedTestCases = null;
       }
     }
+
+    // Only run tests if we have valid test cases
+    if (parsedTestCases && Array.isArray(parsedTestCases) && parsedTestCases.length > 0) {
+      const evalResult = await runTests({
+        sourceCode: submitted_code,
+        languageName: language || challenge.programming_languages?.name?.toLowerCase() || 'javascript',
+        testCases: parsedTestCases,
+        challengeId: challenge_id,
+        timeLimitMs: (challenge.time_limit_minutes || 5) * 60 * 1000,
+        memoryLimitMb: 256
+      });
+
+      score = evalResult.score || 0;
+      status = score >= 60 ? 'passed' : 'failed';
+      testResults = evalResult.tests;
+      feedback = `Score: ${score}%. ${status === 'passed' ? 'Excellent work!' : 'Keep practicing!'}`;
+    } else {
+      // No valid test cases - use basic code quality scoring
+      console.warn('⚠️ Challenge has no valid test cases, using basic evaluation');
+      
+      // Basic code quality check
+      const codeLength = submitted_code.trim().length;
+      const hasFunction = /function\s+\w+|const\s+\w+\s*=|def\s+\w+|class\s+\w+/i.test(submitted_code);
+      const hasLogic = /if\s*\(|for\s*\(|while\s*\(|switch\s*\(/i.test(submitted_code);
+      const hasReturn = /return\s+/i.test(submitted_code);
+      
+      // Calculate basic score
+      score = 0;
+      if (codeLength > 20) score += 20;
+      if (hasFunction) score += 30;
+      if (hasLogic) score += 25;
+      if (hasReturn) score += 25;
+      
+      status = score >= 60 ? 'passed' : 'failed';
+      feedback = status === 'passed' 
+        ? 'Good effort! Your code shows understanding of the concept.'
+        : 'Your solution needs more work. Make sure to include proper functions and logic.';
+    }
+  } catch (evalError) {
+    console.error('Code evaluation error:', evalError);
+    
+    // Use basic scoring as fallback
+    const codeLength = submitted_code.trim().length;
+    score = codeLength > 50 ? 50 : Math.floor(codeLength / 2);
+    status = 'failed';
+    feedback = 'Error evaluating your code. Your submission has been recorded but could not be fully tested.';
+  }
+} else {
+  // No test cases at all - use basic code quality scoring
+  console.warn('⚠️ Challenge has no test_cases field');
+  
+  const codeLength = submitted_code.trim().length;
+  const hasFunction = /function\s+\w+|const\s+\w+\s*=|def\s+\w+|class\s+\w+/i.test(submitted_code);
+  const hasLogic = /if\s*\(|for\s*\(|while\s*\(|switch\s*\(/i.test(submitted_code);
+  const hasReturn = /return\s+/i.test(submitted_code);
+  
+  score = 0;
+  if (codeLength > 20) score += 20;
+  if (hasFunction) score += 30;
+  if (hasLogic) score += 25;
+  if (hasReturn) score += 25;
+  
+  status = score >= 60 ? 'passed' : 'failed';
+  feedback = status === 'passed'
+    ? 'Your code shows good structure. Note: This challenge had no automated tests.'
+    : 'Please add more complete logic to your solution.';
+}
 
     // Create challenge attempt record
     const { data: attempt, error: attemptError } = await supabase

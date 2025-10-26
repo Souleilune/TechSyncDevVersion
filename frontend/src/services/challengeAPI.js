@@ -319,6 +319,29 @@ class ChallengeAPI {
   }
 
   /**
+ * Attempt a challenge (for profile language verification)
+ * This method submits a challenge attempt for language verification purposes
+ * @param {string} challengeId - Challenge ID
+ * @param {Object} attemptData - Attempt submission data
+ * @param {string} attemptData.solution_code - The submitted solution code
+ * @param {number} attemptData.programming_language_id - Programming language ID
+ * @returns {Promise} - Submission result with attempt details
+ */
+static async attemptChallenge(challengeId, attemptData) {
+  try {
+    const response = await api.post('/challenges/submit', {
+      challenge_id: challengeId,
+      submitted_code: attemptData.solution_code,
+      programming_language_id: attemptData.programming_language_id
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error attempting challenge:', error);
+    throw error;
+  }
+}
+
+  /**
    * Get attempt details by ID
    * @param {string} attemptId - Attempt ID
    * @returns {Promise} - Attempt details
