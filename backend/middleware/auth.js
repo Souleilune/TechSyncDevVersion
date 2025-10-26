@@ -1,4 +1,4 @@
-// backend/middleware/auth.js
+// backend/middleware/auth.js - FIXED VERSION WITH ROLE
 const jwt = require('jsonwebtoken');
 const supabase = require('../config/supabase');
 
@@ -33,10 +33,10 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    // Get user from database to ensure they still exist
+    // Get user from database to ensure they still exist - FIXED: Added 'role' field
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, username, full_name, is_active')
+      .select('id, email, username, full_name, role, is_active')  // ✅ ADDED ROLE
       .eq('id', decoded.userId || decoded.id)
       .single();
 
@@ -54,15 +54,16 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    // Attach user to request object
+    // Attach user to request object - FIXED: Added role field
     req.user = {
       id: user.id,
       email: user.email,
       username: user.username,
-      fullName: user.full_name
+      fullName: user.full_name,
+      role: user.role || 'user'  // ✅ ADDED ROLE WITH DEFAULT
     };
 
-    console.log(`Authenticated user: ${user.username} (${user.id})`);
+    console.log(`Authenticated user: ${user.username} (${user.id}) - Role: ${req.user.role}`);
     
     next();
   } catch (error) {
@@ -75,7 +76,7 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-// Optional middleware - doesn't fail if no token provided
+// Optional middleware - doesn't fail if no token provided - FIXED: Added role field
 const optionalAuthMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -95,20 +96,23 @@ const optionalAuthMiddleware = async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
+      // FIXED: Added 'role' field to select
       const { data: user, error } = await supabase
         .from('users')
-        .select('id, email, username, full_name, is_active')
+        .select('id, email, username, full_name, role, is_active')  // ✅ ADDED ROLE
         .eq('id', decoded.userId || decoded.id)
         .single();
 
       if (error || !user || !user.is_active) {
         req.user = null;
       } else {
+        // FIXED: Added role field to user object
         req.user = {
           id: user.id,
           email: user.email,
           username: user.username,
-          fullName: user.full_name
+          fullName: user.full_name,
+          role: user.role || 'user'  // ✅ ADDED ROLE WITH DEFAULT
         };
       }
     } catch (jwtError) {

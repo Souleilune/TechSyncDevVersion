@@ -1,44 +1,37 @@
-// backend/controllers/projectRecruitmentController.js - COMPLETE FIXED VERSION
-'use strict';
-// @ts-nocheck
-
+// backend/controllers/projectRecruitmentController.js - FIXED VERSION
 const supabase = require('../config/supabase');
-const { runTests } = require('../utils/codeEvaluator');
 const { updateSkillRatings } = require('./challengeController');
 
 /* ============================== Helper Functions ============================== */
 
-// Count user's failed attempts for a specific project
+// Get failed attempts count for a user on a specific project
 const getFailedAttemptsCount = async (userId, projectId) => {
   try {
-    const { data: failedAttempts, error } = await supabase
+    const { data, error } = await supabase
       .from('challenge_attempts')
-      .select('id')
+      .select('id, status')
       .eq('user_id', userId)
       .eq('project_id', projectId)
       .eq('status', 'failed');
 
     if (error) {
-      console.error('Error counting failed attempts:', error);
+      console.error('Error fetching failed attempts:', error);
       return 0;
     }
-    return failedAttempts ? failedAttempts.length : 0;
+
+    return data ? data.length : 0;
   } catch (error) {
     console.error('Error in getFailedAttemptsCount:', error);
     return 0;
   }
 };
 
-// Comforting message based on attempt count
+// Generate comforting message based on attempt count
 const generateComfortingMessage = (attemptCount, projectTitle) => {
   const messages = [
     {
-      threshold: 15,
-      message: `You've made ${attemptCount} attempts at "${projectTitle}" - that shows incredible persistence! Sometimes it helps to step back and approach the problem from a different angle. Consider reaching out to the community for tips, or exploring similar but simpler projects to build your confidence. You've got this!`
-    },
-    {
       threshold: 10,
-      message: `We notice you've been persistently trying to join "${projectTitle}". Your determination is admirable! However, you might want to take a short break, review some coding tutorials, or try some easier projects first. Remember, every expert was once a beginner!`
+      message: `You've tried ${attemptCount} times to join "${projectTitle}". It's completely okay to take a break and come back stronger! Consider exploring beginner-friendly resources or trying a different project that matches your current skill level. Remember, every expert was once a beginner!`
     },
     {
       threshold: 7,
@@ -64,7 +57,12 @@ function getStarterCodeForLanguage(languageName) {
     'C#': '// Your C# solution here\nusing System;\n\nclass Program {\n    static void Main() {\n        // TODO: Implement your solution\n    }\n}',
     Go: '// Your Go solution here\npackage main\n\nimport "fmt"\n\nfunc main() {\n    // TODO: Implement your solution\n}',
     Rust: '// Your Rust solution here\nfn main() {\n    // TODO: Implement your solution\n}',
-    TypeScript: '// Your TypeScript solution here\nfunction solution(): any {\n    // TODO: Implement your solution\n    return null;\n}'
+    TypeScript: '// Your TypeScript solution here\nfunction solution(): any {\n    // TODO: Implement your solution\n    return null;\n}',
+    C: '// Your C solution here\n#include <stdio.h>\n\nint main() {\n    // TODO: Implement your solution\n    return 0;\n}',
+    PHP: '<?php\n// Your PHP solution here\nfunction solution() {\n    // TODO: Implement your solution\n}\n?>',
+    Ruby: '# Your Ruby solution here\ndef solution\n    # TODO: Implement your solution\nend',
+    Swift: '// Your Swift solution here\nfunc solution() {\n    // TODO: Implement your solution\n}',
+    Kotlin: '// Your Kotlin solution here\nfun solution() {\n    // TODO: Implement your solution\n}'
   };
   return starterCodes[languageName] || `// Your ${languageName} solution here\n// TODO: Implement your solution`;
 }
@@ -91,6 +89,16 @@ function checkLanguageMatch(code, langName) {
       return s.includes('package main') || s.includes('func main(');
     case 'rust':
       return s.includes('fn main(');
+    case 'c':
+      return s.includes('#include') || s.includes('int main(');
+    case 'php':
+      return s.includes('<?php') || s.includes('function ') || s.includes('echo');
+    case 'ruby':
+      return s.includes('def ') || s.includes('end') || s.includes('puts');
+    case 'swift':
+      return s.includes('func ') || s.includes('let ') || s.includes('var ');
+    case 'kotlin':
+      return s.includes('fun ') || s.includes('val ') || s.includes('var ');
     default:
       return hasAnyProgrammingLanguageFeatures(s);
   }
@@ -270,8 +278,20 @@ const getProjectChallenge = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Project not found' });
     }
 
-    // Get existing challenge for this project
-    const { data: existingChallenge } = await supabase
+    // Get primary language for the project
+    const projPrimaryLang = project.project_languages?.find(pl => pl.is_primary);
+    const primaryLanguageId = projPrimaryLang?.language_id || project.project_languages?.[0]?.language_id;
+    const primaryLanguageName = projPrimaryLang?.programming_languages?.name || project.project_languages?.[0]?.programming_languages?.name || 'JavaScript';
+
+    console.log('🔍 Project language info:', {
+      projectId,
+      primaryLanguageId,
+      primaryLanguageName,
+      allProjectLanguages: project.project_languages
+    });
+
+    // FIXED: First check for project-specific challenge
+    const { data: projectSpecificChallenge } = await supabase
       .from('coding_challenges')
       .select(`
         *,
@@ -281,26 +301,86 @@ const getProjectChallenge = async (req, res) => {
       .eq('is_active', true)
       .single();
 
-    let selectedChallenge = existingChallenge;
-    const projPrimaryLang = project.project_languages?.find(pl => pl.is_primary);
-
-    // Create temporary challenge if none exists
-    if (!selectedChallenge) {
-      const langForTemp = projPrimaryLang?.programming_languages || { id: 2, name: 'JavaScript' };
-      selectedChallenge = {
-        id: `temp_${projectId}_${Date.now()}`,
-        project_id: projectId,
-        title: `Join ${project.title}`,
-        description: `Please complete this coding challenge to demonstrate your skills.\n\nTask: Write a function that demonstrates your ${langForTemp.name} programming skills.`,
-        difficulty_level: 'medium',
-        time_limit_minutes: 60,
-        starter_code: getStarterCodeForLanguage(langForTemp.name),
-        test_cases: null,
-        programming_language_id: langForTemp.id,
-        programming_languages: langForTemp,
-        isTemporary: true
-      };
+    // If project has a specific challenge, use it
+    if (projectSpecificChallenge) {
+      console.log('✅ Found project-specific challenge:', projectSpecificChallenge.id);
+      return res.json({
+        success: true,
+        challenge: projectSpecificChallenge,
+        project: {
+          id: project.id,
+          title: project.title,
+          description: project.description,
+          primaryLanguage: primaryLanguageName,
+          availableSpots: project.maximum_members - project.current_members
+        }
+      });
     }
+
+    // FIXED: If no project-specific challenge, fetch a REAL challenge from the database
+    // that matches the project's programming language
+    if (primaryLanguageId) {
+      console.log('🔎 Looking for generic challenge with language ID:', primaryLanguageId);
+      
+      const { data: languageMatchingChallenges, error: challengeError } = await supabase
+        .from('coding_challenges')
+        .select(`
+          *,
+          programming_languages(id, name)
+        `)
+        .eq('programming_language_id', primaryLanguageId)
+        .eq('is_active', true)
+        .is('project_id', null) // Generic challenges have no project_id
+        .order('difficulty_level', { ascending: true })
+        .limit(5);
+
+      if (challengeError) {
+        console.error('Error fetching language-matching challenges:', challengeError);
+      }
+
+      if (languageMatchingChallenges && languageMatchingChallenges.length > 0) {
+        // Pick a random challenge from the matching ones (or pick by difficulty)
+        const selectedChallenge = languageMatchingChallenges[Math.floor(Math.random() * languageMatchingChallenges.length)];
+        
+        console.log('✅ Found generic challenge matching language:', {
+          challengeId: selectedChallenge.id,
+          challengeTitle: selectedChallenge.title,
+          languageId: selectedChallenge.programming_language_id,
+          languageName: selectedChallenge.programming_languages?.name
+        });
+
+        return res.json({
+          success: true,
+          challenge: selectedChallenge,
+          project: {
+            id: project.id,
+            title: project.title,
+            description: project.description,
+            primaryLanguage: primaryLanguageName,
+            availableSpots: project.maximum_members - project.current_members
+          }
+        });
+      } else {
+        console.log('⚠️ No matching challenges found for language ID:', primaryLanguageId);
+      }
+    }
+
+    // FALLBACK: Only create temporary challenge if no real challenges exist
+    console.log('⚠️ Creating temporary fallback challenge');
+    const langForTemp = projPrimaryLang?.programming_languages || { id: 2, name: 'JavaScript' };
+    const selectedChallenge = {
+      id: `temp_${projectId}_${Date.now()}`,
+      project_id: projectId,
+      title: `Join ${project.title}`,
+      description: `Please complete this coding challenge to demonstrate your skills.\n\nTask: Write a function that demonstrates your ${langForTemp.name} programming skills.`,
+      difficulty_level: 'medium',
+      time_limit_minutes: 60,
+      starter_code: getStarterCodeForLanguage(langForTemp.name),
+      test_cases: null,
+      programming_language_id: langForTemp.id,
+      programming_languages: langForTemp,
+      isTemporary: true
+    };
 
     return res.json({
       success: true,
@@ -309,7 +389,7 @@ const getProjectChallenge = async (req, res) => {
         id: project.id,
         title: project.title,
         description: project.description,
-        primaryLanguage: projPrimaryLang?.programming_languages?.name || 'Unknown',
+        primaryLanguage: primaryLanguageName,
         availableSpots: project.maximum_members - project.current_members
       }
     });
@@ -326,31 +406,73 @@ const canAttemptChallenge = async (req, res) => {
     const userId = req.user.id;
 
     // Already a member?
-    const { data: membership, error: membershipError } = await supabase
+    const { data: membership } = await supabase
       .from('project_members')
       .select('*')
       .eq('project_id', projectId)
       .eq('user_id', userId)
       .single();
 
-    if (membershipError && membershipError.code !== 'PGRST116') {
-      return res.status(500).json({ success: false, message: 'Error checking membership status' });
-    }
-
     if (membership) {
-      return res.json({ success: true, canAttempt: false, reason: 'You are already a member of this project' });
+      return res.json({
+        canAttempt: false,
+        reason: 'already_member',
+        message: 'You are already a member of this project'
+      });
     }
 
-    // Failed attempts
+    // Check failed attempts
     const failedAttemptsCount = await getFailedAttemptsCount(userId, projectId);
 
-    // Project info
+    // Check if we should show alert
+    let alertData = null;
+    if (failedAttemptsCount >= 7) {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('title, project_languages(language_id, is_primary)')
+        .eq('id', projectId)
+        .single();
+
+      const title = project?.title || 'this project';
+      const plId = project?.project_languages?.find(pl => pl.is_primary)?.language_id ||
+                   project?.project_languages?.[0]?.language_id ||
+                   2;
+
+      alertData = {
+        shouldShow: true,
+        attemptCount: failedAttemptsCount,
+        message: generateComfortingMessage(failedAttemptsCount, title),
+        programmingLanguageId: plId
+      };
+    }
+
+    return res.json({
+      canAttempt: true,
+      failedAttempts: failedAttemptsCount,
+      alertData
+    });
+  } catch (error) {
+    console.error('Error in canAttemptChallenge:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// POST /api/challenges/project/:projectId/attempt
+const submitChallengeAttempt = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const userId = req.user.id;
+    const { submittedCode, startedAt, challengeId } = req.body;
+
+    // Get project with languages
     const { data: project } = await supabase
       .from('projects')
       .select(`
-        title, 
-        current_members, 
-        maximum_members,
+        *,
         project_languages(
           language_id,
           is_primary,
@@ -360,247 +482,50 @@ const canAttemptChallenge = async (req, res) => {
       .eq('id', projectId)
       .single();
 
-    const projectTitle = project?.title || 'this project';
-
-    // Get challenge info for alertData
-    const { data: challengeData } = await supabase
-      .from('coding_challenges')
-      .select('id, difficulty_level')
-      .eq('project_id', projectId)
-      .single();
-
-    // ALWAYS get language ID from project, not challenge (to avoid Judge0 ID confusion)
-    const plId = project?.project_languages?.find(pl => pl.is_primary)?.programming_languages?.id ||
-                 project?.project_languages?.[0]?.programming_languages?.id ||
-                 2; // Default to JavaScript (id: 2)
-
-    // Helper to create complete alertData
-    const createAlertData = (shouldShow, failedCount, message) => {
-      if (!shouldShow) return null;
-      return {
-        shouldShow: true,
-        attemptCount: failedCount,
-        message: message,
-        challengeId: challengeData?.id,
-        programmingLanguageId: plId,
-        difficultyLevel: challengeData?.difficulty_level || 'beginner'
-      };
-    };
-
-    // Rate limit: 1/hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: recentAttempts, error: attemptError } = await supabase
-      .from('challenge_attempts')
-      .select('started_at')
-      .eq('project_id', projectId)
-      .eq('user_id', userId)
-      .gte('started_at', oneHourAgo)
-      .order('started_at', { ascending: false })
-      .limit(1);
-
-    if (attemptError) {
-      return res.status(500).json({ success: false, message: 'Error checking recent attempts' });
-    }
-
-    const shouldShowAlert = failedAttemptsCount >= 7;
-    const comfortingMessage = shouldShowAlert ? generateComfortingMessage(failedAttemptsCount, projectTitle) : null;
-
-    if (recentAttempts && recentAttempts.length > 0) {
-      const lastAttempt = new Date(recentAttempts[0].started_at);
-      const nextAttemptTime = new Date(lastAttempt.getTime() + 60 * 60 * 1000);
-      return res.json({
-        success: true,
-        canAttempt: false,
-        reason: 'You can only attempt once per hour',
-        nextAttemptAt: nextAttemptTime.toISOString(),
-        alertData: createAlertData(shouldShowAlert, failedAttemptsCount, comfortingMessage)
-      });
-    }
-
-    // Capacity
-    if (project && project.current_members >= project.maximum_members) {
-      return res.json({
-        success: true,
-        canAttempt: false,
-        reason: 'Project has reached maximum capacity',
-        alertData: createAlertData(shouldShowAlert, failedAttemptsCount, comfortingMessage)
-      });
-    }
-
-    return res.json({
-      success: true,
-      canAttempt: true,
-      reason: 'You can attempt this challenge',
-      alertData: createAlertData(shouldShowAlert, failedAttemptsCount, comfortingMessage)
-    });
-  } catch (error) {
-    console.error('Error in canAttemptChallenge:', error);
-    return res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
-  }
-};
-
-// POST /api/challenges/project/:projectId/attempt
-const submitChallengeAttempt = async (req, res) => {
-  try {
-    const { projectId } = req.params;
-    const { submittedCode, startedAt, challengeId } = req.body;
-    const userId = req.user.id;
-
-    // Validate submission
-    if (!submittedCode || submittedCode.trim().length < 10) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          attempt: null,
-          score: 0,
-          passed: false,
-          projectJoined: false,
-          feedback: 'Your solution is too short. Please provide a more complete solution.',
-          status: 'failed'
-        }
-      });
-    }
-
-    // Already a member?
-    const { data: membership } = await supabase
-      .from('project_members')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('user_id', userId)
-      .single();
-
-    if (membership) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          attempt: null,
-          score: 0,
-          passed: false,
-          projectJoined: false,
-          feedback: 'You are already a member of this project.',
-          status: 'already_member'
-        }
-      });
-    }
-
-    // Load project
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', projectId)
-      .single();
-
-    if (projectError || !project) {
+    if (!project) {
       return res.status(404).json({ success: false, message: 'Project not found' });
     }
 
-    const { data: projectLanguages, error: projectLangError } = await supabase
-      .from('project_languages')
-      .select(`
-        language_id,
-        is_primary,
-        programming_languages ( id, name )
-      `)
-      .eq('project_id', projectId);
+    // Evaluate code submission
+    const evaluation = evaluateCodeSubmission(submittedCode, project);
+    const finalScore = evaluation.score;
+    const feedback = evaluation.feedback;
+    const passed = finalScore >= 70;
 
-    if (projectLangError) {
-      console.error('Project languages query error:', projectLangError);
-      return res.status(500).json({
-        success: false,
-        message: 'Error fetching project languages',
-        error: projectLangError.message
-      });
-    }
-
-    project.project_languages = projectLanguages || [];
-
-    // Load challenge if provided
+    // Get the challenge details if available
     let challenge = null;
-    if (challengeId && !String(challengeId).startsWith('temp_')) {
-      const { data: ch, error: chErr } = await supabase
+    if (challengeId && !challengeId.startsWith('temp_')) {
+      const { data: challengeData } = await supabase
         .from('coding_challenges')
-        .select(`
-          id, title, description, difficulty_level, time_limit_minutes,
-          test_cases, expected_solution, programming_language_id,
-          programming_languages ( id, name )
-        `)
+        .select('*')
         .eq('id', challengeId)
         .single();
-      if (!chErr && ch) challenge = ch;
+      challenge = challengeData;
     }
-
-    // Decide language name for Judge0
-    const primaryLanguageName =
-      project.project_languages.find(pl => pl.is_primary)?.programming_languages?.name ||
-      project.project_languages[0]?.programming_languages?.name ||
-      challenge?.programming_languages?.name ||
-      'JavaScript';
-
-    // Heuristic evaluation (baseline)
-    const heuristicEval = evaluateCodeSubmission(submittedCode, project);
-
-    // Defaults from heuristics
-    let finalScore = heuristicEval.score;
-    let passed = heuristicEval.score >= 70;
-    let evaluation = { ...heuristicEval, testSummary: null, testResults: null, judgeUsed: false };
-
-    // If we have test cases, try Judge0
-    if (challenge?.test_cases && Array.isArray(challenge.test_cases) && challenge.test_cases.length > 0) {
-      try {
-        const totalTimeLimit = challenge?.time_limit_minutes ? challenge.time_limit_minutes * 60 : 300;
-        const testResults = await runTests(
-          submittedCode,
-          challenge.test_cases,
-          challenge.programming_language_id || 63,
-          totalTimeLimit
-        );
-
-        evaluation.judgeUsed = true;
-        evaluation.testResults = testResults;
-        evaluation.testSummary = {
-          totalTests: testResults.totalTests,
-          passedTests: testResults.passedCount,
-          failedTests: testResults.failedCount,
-          allPassed: testResults.allPassed
-        };
-
-        // Boost score if tests passed
-        if (testResults.allPassed) {
-          finalScore = Math.max(finalScore, 85);
-        } else if (testResults.passedCount > 0) {
-          finalScore = Math.max(finalScore, 40 + (testResults.passedCount / testResults.totalTests) * 40);
-        }
-
-        passed = finalScore >= 60;
-      } catch (err) {
-        console.error('Judge0 evaluation error:', err);
-      }
-    }
-
-    const feedback = evaluation.feedback || heuristicEval.feedback;
 
     // Create attempt record
     const { data: attempt, error: attemptError } = await supabase
       .from('challenge_attempts')
       .insert({
         user_id: userId,
-        challenge_id: challenge?.id,
+        challenge_id: challengeId && !challengeId.startsWith('temp_') ? challengeId : null,
         project_id: projectId,
         submitted_code: submittedCode,
         score: finalScore,
         status: passed ? 'passed' : 'failed',
-        feedback,
         started_at: startedAt || new Date().toISOString(),
-        submitted_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
+        feedback: feedback
       })
       .select()
       .single();
 
     if (attemptError) {
       console.error('Error creating attempt:', attemptError);
+      return res.status(500).json({ success: false, message: 'Failed to record attempt' });
     }
 
-    // If passed, add to project
+    // If passed, add user to project
     let projectJoined = false;
     let membershipData = null;
 
@@ -610,47 +535,47 @@ const submitChallengeAttempt = async (req, res) => {
         .insert({
           project_id: projectId,
           user_id: userId,
-          joined_at: new Date().toISOString(),
           role: 'member',
-          status: 'active'
+          joined_at: new Date().toISOString()
         })
         .select()
         .single();
 
-      if (!memberError) {
+      if (!memberError && newMember) {
         projectJoined = true;
         membershipData = newMember;
-        try {
-          await supabase.rpc('increment_project_member_count', { project_uuid: projectId });
-        } catch (updateError) {
-          console.error('Error updating member count:', updateError);
+
+        // Update project member count
+        const { error: updateError } = await supabase
+          .from('projects')
+          .update({
+            current_members: (project.current_members || 0) + 1
+          })
+          .eq('id', projectId);
+
+        if (updateError) {
+          console.error('Error updating project member count:', updateError);
         }
-      } else {
-        console.error('Error adding member:', memberError);
       }
     }
 
-    // Update adaptive ratings (non-blocking)
+    // Update skill ratings (non-blocking)
     try {
-      if (challengeId && !String(challengeId).startsWith('temp_')) {
+      if (challengeId && !challengeId.startsWith('temp_')) {
         const plId = project.project_languages?.find(pl => pl.is_primary)?.language_id ||
                      project.project_languages?.[0]?.language_id ||
                      null;
 
         if (plId) {
-          await updateSkillRatings({
-            userId,
-            challengeId,
-            programming_language_id: plId,
-            pass: passed
-          });
+          // FIXED: Call with correct parameter order (userId, programming_language_id, challengeId, pass)
+          await updateSkillRatings(userId, plId, challengeId, passed);
         }
       }
     } catch (e) {
       console.warn('Rating update failed (non-blocking):', e.message);
     }
 
-    // Alert data on fail - ALWAYS use project language ID, not challenge's Judge0 ID
+    // Alert data on fail - ALWAYS use project language ID, not challenge's ID
     let alertData = null;
     if (!passed) {
       const failedAttemptsCount = await getFailedAttemptsCount(userId, projectId);
