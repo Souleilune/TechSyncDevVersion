@@ -1,11 +1,10 @@
-// backend/scripts/testRecommendationScalability.js
+// backend/scripts/testRecommendationScalability_FIXED.js
 const supabase = require('../config/supabase');
 const skillMatching = require('../services/SkillMatchingService');
 const fs = require('fs');
 
 /**
- * Test recommendation algorithm with different user sample sizes
- * for academic paper scalability analysis
+ * FIXED VERSION - Test recommendation algorithm with better error handling and progress tracking
  */
 class RecommendationScalabilityTest {
   constructor() {
@@ -15,15 +14,17 @@ class RecommendationScalabilityTest {
       summary: null,
       timestamp: new Date().toISOString()
     };
+    this.timeout = 30000; // 30 second timeout per user
   }
 
   /**
    * Main test runner
    */
   async runScalabilityTests() {
-    console.log('\n📊 RECOMMENDATION ALGORITHM SCALABILITY TEST');
+    console.log('\n📊 RECOMMENDATION ALGORITHM SCALABILITY TEST (FIXED VERSION)');
     console.log('=' .repeat(70));
     console.log('Testing with different user sample sizes: 20, 50, 100 users');
+    console.log('With improved error handling and progress tracking');
     console.log('=' .repeat(70));
 
     try {
@@ -74,7 +75,7 @@ class RecommendationScalabilityTest {
   }
 
   /**
-   * Run test for specific sample size
+   * Run test for specific sample size with timeout protection
    */
   async runTestForSampleSize(allUsers, sampleSize) {
     console.log(`\n${'─'.repeat(70)}`);
@@ -95,6 +96,8 @@ class RecommendationScalabilityTest {
       minScore: Infinity,
       maxScore: 0,
       executionTime: 0,
+      timeouts: 0,
+      errors: 0,
       scoreDistribution: {
         'excellent (90-100)': 0,
         'good (75-89)': 0,
@@ -102,20 +105,30 @@ class RecommendationScalabilityTest {
         'below_threshold (<55)': 0
       },
       matchQualityMetrics: {
-        perfectMatches: 0,    // Users with score >= 90
-        goodMatches: 0,       // Users with score >= 75
-        acceptableMatches: 0, // Users with score >= 55
-        noMatches: 0          // Users with no recommendations
+        perfectMatches: 0,
+        goodMatches: 0,
+        acceptableMatches: 0,
+        noMatches: 0
       },
       userDetails: []
     };
 
     const startTime = Date.now();
+    let processedCount = 0;
 
-    // Test each user
+    // Test each user with progress tracking
     for (const user of selectedUsers) {
+      processedCount++;
+      const userStartTime = Date.now();
+      
+      // Progress indicator
+      process.stdout.write(`\r  Processing user ${processedCount}/${selectedUsers.length} (${user.email})...`);
+      
       try {
-        const recommendations = await skillMatching.recommendProjects(user.id, { limit: 10 });
+        // Add timeout protection
+        const recommendations = await this.getRecommendationsWithTimeout(user.id);
+        
+        const userTime = Date.now() - userStartTime;
         
         const userResult = {
           userId: user.id,
@@ -124,7 +137,8 @@ class RecommendationScalabilityTest {
           scores: recommendations.map(r => r.score),
           avgScore: recommendations.length > 0 
             ? recommendations.reduce((sum, r) => sum + r.score, 0) / recommendations.length 
-            : 0
+            : 0,
+          processingTime: userTime
         };
 
         testResult.userDetails.push(userResult);
@@ -134,11 +148,9 @@ class RecommendationScalabilityTest {
           testResult.successfulRecommendations++;
           
           recommendations.forEach(rec => {
-            // Update min/max
             testResult.minScore = Math.min(testResult.minScore, rec.score);
             testResult.maxScore = Math.max(testResult.maxScore, rec.score);
 
-            // Update score distribution
             if (rec.score >= 90) {
               testResult.scoreDistribution['excellent (90-100)']++;
               testResult.matchQualityMetrics.perfectMatches++;
@@ -156,13 +168,28 @@ class RecommendationScalabilityTest {
           testResult.matchQualityMetrics.noMatches++;
         }
 
+        // Log slow users
+        if (userTime > 5000) {
+          console.log(`\n  ⚠️  Slow processing for ${user.email}: ${(userTime/1000).toFixed(2)}s`);
+        }
+
       } catch (error) {
-        console.error(`  ⚠️  Error testing user ${user.email}:`, error.message);
+        if (error.message === 'TIMEOUT') {
+          console.log(`\n  ⏱️  Timeout for user ${user.email}`);
+          testResult.timeouts++;
+        } else {
+          console.log(`\n  ⚠️  Error for user ${user.email}: ${error.message}`);
+          testResult.errors++;
+        }
+        
+        testResult.matchQualityMetrics.noMatches++;
       }
     }
 
+    console.log(''); // New line after progress
+
     const endTime = Date.now();
-    testResult.executionTime = (endTime - startTime) / 1000; // Convert to seconds
+    testResult.executionTime = (endTime - startTime) / 1000;
 
     // Calculate averages
     testResult.averageRecommendationsPerUser = 
@@ -175,7 +202,6 @@ class RecommendationScalabilityTest {
       ? allScores.reduce((sum, s) => sum + s, 0) / allScores.length
       : 0;
 
-    // Fix min score if no recommendations
     if (testResult.minScore === Infinity) {
       testResult.minScore = 0;
     }
@@ -185,6 +211,26 @@ class RecommendationScalabilityTest {
 
     // Print immediate results
     this.printTestResult(testResult);
+  }
+
+  /**
+   * Get recommendations with timeout protection
+   */
+  async getRecommendationsWithTimeout(userId) {
+    return new Promise(async (resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('TIMEOUT'));
+      }, this.timeout);
+
+      try {
+        const recommendations = await skillMatching.recommendProjects(userId, { limit: 10 });
+        clearTimeout(timeoutId);
+        resolve(recommendations);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    });
   }
 
   /**
@@ -207,10 +253,19 @@ class RecommendationScalabilityTest {
     console.log(`  Average Score: ${result.averageScore.toFixed(2)}`);
     console.log(`  Score Range: ${result.minScore.toFixed(0)} - ${result.maxScore.toFixed(0)}`);
     console.log(`  Execution Time: ${result.executionTime.toFixed(2)}s`);
+    console.log(`  Avg Time per User: ${(result.executionTime / result.usersTested).toFixed(2)}s`);
+    
+    if (result.timeouts > 0 || result.errors > 0) {
+      console.log(`\n  ⚠️  Issues:`);
+      if (result.timeouts > 0) console.log(`    Timeouts: ${result.timeouts}`);
+      if (result.errors > 0) console.log(`    Errors: ${result.errors}`);
+    }
     
     console.log('\n  Score Distribution:');
     Object.entries(result.scoreDistribution).forEach(([range, count]) => {
-      const percentage = ((count / result.totalRecommendations) * 100).toFixed(1);
+      const percentage = result.totalRecommendations > 0 
+        ? ((count / result.totalRecommendations) * 100).toFixed(1)
+        : '0.0';
       console.log(`    ${range}: ${count} (${percentage}%)`);
     });
 
@@ -219,6 +274,19 @@ class RecommendationScalabilityTest {
     console.log(`    Good Matches (≥75): ${result.matchQualityMetrics.goodMatches} users`);
     console.log(`    Acceptable Matches (≥55): ${result.matchQualityMetrics.acceptableMatches} users`);
     console.log(`    No Matches: ${result.matchQualityMetrics.noMatches} users`);
+
+    // Show slowest users
+    const sortedByTime = [...result.userDetails].sort((a, b) => b.processingTime - a.processingTime);
+    const slowest = sortedByTime.slice(0, 3);
+    
+    if (slowest.length > 0 && slowest[0].processingTime > 1000) {
+      console.log('\n  ⏱️  Slowest Users:');
+      slowest.forEach((user, i) => {
+        if (user.processingTime > 1000) {
+          console.log(`    ${i+1}. ${user.email}: ${(user.processingTime/1000).toFixed(2)}s (${user.recommendationCount} recs)`);
+        }
+      });
+    }
   }
 
   /**
@@ -234,7 +302,6 @@ class RecommendationScalabilityTest {
       comparison: {}
     };
 
-    // Create comparison table
     console.log('\nSample Size Comparison:\n');
     console.log('Metric                          | 20 Users    | 50 Users    | 100 Users');
     console.log('─'.repeat(75));
@@ -278,6 +345,8 @@ class RecommendationScalabilityTest {
       console.log(`   Avg Score: ${test.averageScore.toFixed(2)}`);
       console.log(`   Execution Time: ${test.executionTime.toFixed(2)}s`);
       console.log(`   Time per User: ${(test.executionTime / test.usersTested).toFixed(3)}s`);
+      if (test.timeouts > 0) console.log(`   Timeouts: ${test.timeouts}`);
+      if (test.errors > 0) console.log(`   Errors: ${test.errors}`);
     });
   }
 
@@ -285,15 +354,11 @@ class RecommendationScalabilityTest {
    * Export results to files
    */
   exportResults() {
-    // Export JSON
     const jsonFile = 'scalability-test-results.json';
     fs.writeFileSync(jsonFile, JSON.stringify(this.results, null, 2));
     console.log(`\n💾 Full results saved to: ${jsonFile}`);
 
-    // Export CSV for paper tables
     this.exportTableCSV();
-
-    // Export Markdown report
     this.exportMarkdownReport();
   }
 
@@ -346,6 +411,9 @@ class RecommendationScalabilityTest {
     md += `**Test Sizes**: ${this.testSizes.join(', ')} users\n\n`;
     md += '---\n\n';
 
+    md += '## Summary\n\n';
+    md += `Total tests completed: ${this.results.tests.length}\n\n`;
+
     md += '## Table: Scalability Comparison\n\n';
     md += '| Metric | 20 Users | 50 Users | 100 Users |\n';
     md += '|--------|----------|----------|----------|\n';
@@ -354,15 +422,13 @@ class RecommendationScalabilityTest {
     const test50 = this.results.tests[1];
     const test100 = this.results.tests[2];
 
-    md += `| Total Recommendations | ${test20?.totalRecommendations || 'N/A'} | ${test50?.totalRecommendations || 'N/A'} | ${test100?.totalRecommendations || 'N/A'} |\n`;
-    md += `| Avg Recs/User | ${test20?.averageRecommendationsPerUser.toFixed(2) || 'N/A'} | ${test50?.averageRecommendationsPerUser.toFixed(2) || 'N/A'} | ${test100?.averageRecommendationsPerUser.toFixed(2) || 'N/A'} |\n`;
-    md += `| Average Score | ${test20?.averageScore.toFixed(2) || 'N/A'} | ${test50?.averageScore.toFixed(2) || 'N/A'} | ${test100?.averageScore.toFixed(2) || 'N/A'} |\n`;
-    md += `| Success Rate (%) | ${test20 ? ((test20.successfulRecommendations / test20.usersTested) * 100).toFixed(1) : 'N/A'} | ${test50 ? ((test50.successfulRecommendations / test50.usersTested) * 100).toFixed(1) : 'N/A'} | ${test100 ? ((test100.successfulRecommendations / test100.usersTested) * 100).toFixed(1) : 'N/A'} |\n`;
-    md += `| Execution Time (s) | ${test20?.executionTime.toFixed(2) || 'N/A'} | ${test50?.executionTime.toFixed(2) || 'N/A'} | ${test100?.executionTime.toFixed(2) || 'N/A'} |\n`;
-
-    md += '\n**Interpretation**: ';
-    md += 'The algorithm demonstrates consistent performance across different user sample sizes. ';
-    md += 'Average scores remain stable, indicating algorithm reliability regardless of scale.\n\n';
+    if (test20) {
+      md += `| Total Recommendations | ${test20.totalRecommendations} | ${test50?.totalRecommendations || 'N/A'} | ${test100?.totalRecommendations || 'N/A'} |\n`;
+      md += `| Avg Recs/User | ${test20.averageRecommendationsPerUser.toFixed(2)} | ${test50?.averageRecommendationsPerUser.toFixed(2) || 'N/A'} | ${test100?.averageRecommendationsPerUser.toFixed(2) || 'N/A'} |\n`;
+      md += `| Average Score | ${test20.averageScore.toFixed(2)} | ${test50?.averageScore.toFixed(2) || 'N/A'} | ${test100?.averageScore.toFixed(2) || 'N/A'} |\n`;
+      md += `| Success Rate (%) | ${((test20.successfulRecommendations / test20.usersTested) * 100).toFixed(1)} | ${test50 ? ((test50.successfulRecommendations / test50.usersTested) * 100).toFixed(1) : 'N/A'} | ${test100 ? ((test100.successfulRecommendations / test100.usersTested) * 100).toFixed(1) : 'N/A'} |\n`;
+      md += `| Execution Time (s) | ${test20.executionTime.toFixed(2)} | ${test50?.executionTime.toFixed(2) || 'N/A'} | ${test100?.executionTime.toFixed(2) || 'N/A'} |\n`;
+    }
 
     const filename = 'scalability-test-report.md';
     fs.writeFileSync(filename, md);
