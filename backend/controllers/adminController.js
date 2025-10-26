@@ -495,8 +495,8 @@ const getChallenges = async (req, res) => {
       page = 1,
       limit = 20,
       search,
-      difficulty,
-      language,
+      difficulty_level,        // FIXED: Changed from 'difficulty' to 'difficulty_level'
+      programming_language_id, // FIXED: Changed from 'language' to 'programming_language_id'
       is_active
     } = req.query;
 
@@ -506,10 +506,10 @@ const getChallenges = async (req, res) => {
       .from('coding_challenges')
       .select(`
         *,
-        programming_languages (name),
-        users:created_by (username, full_name),
+        programming_languages (id, name),
+        users:created_by (id, username, full_name),
         challenge_attempts (id)
-      `)
+      `, { count: 'exact' })
       .range(offset, offset + limit - 1)
       .order('created_at', { ascending: false });
 
@@ -518,28 +518,41 @@ const getChallenges = async (req, res) => {
       query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
-    if (difficulty) {
-      query = query.eq('difficulty', difficulty);
+    // FIXED: Use difficulty_level instead of difficulty
+    if (difficulty_level) {
+      query = query.eq('difficulty_level', difficulty_level);
     }
 
-    if (language) {
-      query = query.eq('language_id', parseInt(language));
+    // FIXED: Use programming_language_id instead of language, and parse as integer
+    if (programming_language_id) {
+      const langId = parseInt(programming_language_id);
+      if (!isNaN(langId) && langId > 0) {
+        query = query.eq('programming_language_id', langId);
+      }
     }
 
+    // Handle is_active filter
     if (is_active === 'true') {
       query = query.eq('is_active', true);
     } else if (is_active === 'false') {
       query = query.eq('is_active', false);
     }
 
-    const { data: challenges, error } = await query;
+    const { data: challenges, error, count } = await query;
 
     if (error) {
       throw error;
     }
 
     // Log admin access
-    await logAdminActivity(req.admin.id, 'VIEW_CHALLENGES', 'challenge', null, { filters: req.query }, req);
+    await logAdminActivity(
+      req.admin.id, 
+      'VIEW_CHALLENGES', 
+      'challenge', 
+      null, 
+      { filters: req.query }, 
+      req
+    );
 
     res.json({
       success: true,
@@ -548,7 +561,8 @@ const getChallenges = async (req, res) => {
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: challenges.length
+          total: count || challenges.length,
+          totalPages: Math.ceil((count || challenges.length) / limit)
         }
       }
     });
@@ -556,7 +570,8 @@ const getChallenges = async (req, res) => {
     console.error('Get challenges error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch challenges'
+      message: 'Failed to fetch challenges',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };

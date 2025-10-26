@@ -1,4 +1,4 @@
-// backend/routes/admin.js
+// backend/routes/admin.js - FIXED VERSION
 const express = require('express');
 const router = express.Router();
 const { body, param, query, validationResult } = require('express-validator');
@@ -11,13 +11,20 @@ const {
   getDashboardStats,
   getUsers,
   updateUser,
-  deleteUser,  // Add this import
+  deleteUser,
   getProjects,
   getChallenges,
   getSystemSettings,
   updateSystemSettings,
   getActivityLogs
 } = require('../controllers/adminController');
+
+// Import challenge controller functions for admin use
+const {
+  createChallenge,
+  updateChallenge,
+  deleteChallenge
+} = require('../controllers/challengeController');
 
 const authMiddleware = require('../middleware/auth');
 const { requireAdmin, requireModerator } = require('../middleware/adminAuth');
@@ -34,6 +41,20 @@ const handleValidationErrors = (req, res, next) => {
   }
   next();
 };
+
+// Challenge validation - FIXED to use programming_language_id (integer) not programming_language (string)
+const challengeValidation = [
+  body('title').isString().isLength({ min: 1, max: 200 }).withMessage('Title must be between 1 and 200 characters'),
+  body('description').isString().isLength({ min: 1, max: 5000 }).withMessage('Description must be between 1 and 5000 characters'),
+  body('difficulty_level').isIn(['easy', 'medium', 'hard', 'expert']).withMessage('Difficulty must be easy|medium|hard|expert'),
+  body('programming_language_id').optional().isInt({ min: 1 }).withMessage('Programming language ID must be a positive integer'),
+  body('time_limit_minutes').optional().isInt({ min: 1, max: 480 }).withMessage('Time limit must be between 1 and 480 minutes'),
+  body('is_active').optional().isBoolean(),
+  body('test_cases').optional(),
+  body('starter_code').optional().isLength({ max: 10000 }),
+  body('expected_solution').optional().isLength({ max: 50000 }),
+  body('project_id').optional().isUUID().withMessage('Project ID must be a valid UUID if provided')
+];
 
 // All admin routes require authentication
 router.use(authMiddleware);
@@ -60,12 +81,6 @@ router.put('/users/:userId', requireAdmin, [
   body('suspension_duration').optional().isInt({ min: 1, max: 525600 }) // max 1 year in minutes
 ], handleValidationErrors, updateUser);
 
-// DELETE /admin/users/:userId - Delete user permanently (Admin only)
-router.delete('/users/:userId', requireAdmin, [
-  param('userId').isUUID().withMessage('Invalid user ID format')
-], handleValidationErrors, deleteUser);
-
-// DELETE /admin/users/:userId - Delete user permanently (Admin only)
 router.delete('/users/:userId', requireAdmin, [
   param('userId').isUUID().withMessage('Invalid user ID format')
 ], handleValidationErrors, deleteUser);
@@ -79,15 +94,31 @@ router.get('/projects', requireModerator, [
   query('difficulty').optional().isIn(['easy', 'medium', 'hard', 'expert'])
 ], handleValidationErrors, getProjects);
 
-// Challenge management (Admin & Moderator)
+// ===== CHALLENGE MANAGEMENT (Admin & Moderator) - FIXED =====
+
+// GET /admin/challenges - Get all challenges with filters
 router.get('/challenges', requireModerator, [
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('search').optional().isLength({ min: 1, max: 100 }),
-  query('difficulty').optional().isIn(['easy', 'medium', 'hard', 'expert']),
-  query('language').optional().isInt({ min: 1 }),
+  query('difficulty_level').optional().isIn(['easy', 'medium', 'hard', 'expert']),
+  query('programming_language_id').optional().isInt({ min: 1 }),
   query('is_active').optional().isIn(['true', 'false'])
 ], handleValidationErrors, getChallenges);
+
+// POST /admin/challenges - Create new challenge
+router.post('/challenges', requireModerator, challengeValidation, handleValidationErrors, createChallenge);
+
+// PUT /admin/challenges/:id - Update challenge
+router.put('/challenges/:id', requireModerator, [
+  param('id').isUUID().withMessage('Challenge ID must be a valid UUID'),
+  ...challengeValidation
+], handleValidationErrors, updateChallenge);
+
+// DELETE /admin/challenges/:id - Delete challenge
+router.delete('/challenges/:id', requireModerator, [
+  param('id').isUUID().withMessage('Challenge ID must be a valid UUID')
+], handleValidationErrors, deleteChallenge);
 
 // System settings (Admin only)
 router.get('/settings', requireAdmin, getSystemSettings);
@@ -99,132 +130,58 @@ router.put('/settings', requireAdmin, [
 // Activity logs (Admin only)
 router.get('/activity-logs', requireAdmin, [
   query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 200 }),
-  query('admin_id').optional().isUUID(),
-  query('action').optional().isLength({ min: 1, max: 100 }),
-  query('resource_type').optional().isLength({ min: 1, max: 50 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('action').optional().isString(),
+  query('resource_type').optional().isString(),
   query('date_from').optional().isISO8601(),
   query('date_to').optional().isISO8601()
 ], handleValidationErrors, getActivityLogs);
 
-// Analytics endpoints (Admin only)
-router.get('/analytics/user-growth', requireAdmin, async (req, res) => {
+// Analytics routes
+router.get('/analytics/overview', requireAdmin, async (req, res) => {
   try {
-    const { timeframe = '30d' } = req.query;
-    const data = await AnalyticsService.getUserGrowth(timeframe);
-    res.json({ success: true, data });
+    const overview = await AnalyticsService.getOverviewMetrics();
+    res.json({ success: true, data: overview });
   } catch (error) {
-    console.error('User growth analytics error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch user growth analytics'
-    });
+    console.error('Analytics overview error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch analytics', error: error.message });
   }
 });
 
-router.get('/analytics/project-stats', requireAdmin, async (req, res) => {
+router.get('/analytics/confusion-matrix', requireAdmin, async (req, res) => {
   try {
-    const { timeframe = '30d' } = req.query;
-    const data = await AnalyticsService.getProjectStats(timeframe);
-    res.json({ success: true, data });
+    const { from, to } = req.query;
+    const matrix = await AnalyticsService.getConfusionMatrixData(from, to);
+    res.json({ success: true, data: matrix });
   } catch (error) {
-    console.error('Project stats analytics error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch project analytics'
-    });
+    console.error('Confusion matrix error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch confusion matrix', error: error.message });
   }
 });
 
-router.get('/analytics/challenge-performance', requireAdmin, async (req, res) => {
-  try {
-    const { timeframe = '30d' } = req.query;
-    const data = await AnalyticsService.getChallengePerformance(timeframe);
-    res.json({ success: true, data });
-  } catch (error) {
-    console.error('Challenge performance analytics error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch challenge analytics'
-    });
-  }
-});
-
-// Development/Testing endpoints (Admin only, only in development)
-if (process.env.NODE_ENV === 'development') {
-  // Seed confusion matrix data
+// Development/Testing routes (only in development)
+if (process.env.NODE_ENV !== 'production') {
   router.post('/dev/seed-confusion-matrix', requireAdmin, async (req, res) => {
     try {
-      const { userCount = 50, projectCount = 20 } = req.body;
-      await DataSeeder.seedConfusionMatrixData(userCount, projectCount);
-      res.json({
-        success: true,
-        message: `Seeded confusion matrix data for ${userCount} users and ${projectCount} projects`
-      });
+      const seeder = new DataSeeder();
+      const result = await seeder.seedAll();
+      res.json({ success: true, data: result });
     } catch (error) {
-      console.error('Seeding error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to seed confusion matrix data',
-        error: error.message
-      });
+      console.error('Seed error:', error);
+      res.status(500).json({ success: false, message: 'Seeding failed', error: error.message });
     }
   });
 
-  // Test confusion matrix
-  router.post('/dev/test-confusion-matrix', requireAdmin, async (req, res) => {
+  router.get('/dev/test-confusion-matrix', requireAdmin, async (req, res) => {
     try {
-      const { userId, limit = 10 } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({
-          success: false,
-          message: 'User ID is required'
-        });
-      }
-
-      const results = await ConfusionMatrixTester.testUserRecommendations(userId, limit);
-      res.json({
-        success: true,
-        data: results
-      });
+      const tester = new ConfusionMatrixTester();
+      const result = await tester.runAllTests();
+      res.json({ success: true, data: result });
     } catch (error) {
-      console.error('Confusion matrix test error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to test confusion matrix',
-        error: error.message
-      });
-    }
-  });
-
-  // Clear all confusion matrix data
-  router.delete('/dev/clear-confusion-matrix', requireAdmin, async (req, res) => {
-    try {
-      await DataSeeder.clearConfusionMatrixData();
-      res.json({
-        success: true,
-        message: 'Cleared all confusion matrix data'
-      });
-    } catch (error) {
-      console.error('Clear data error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to clear confusion matrix data',
-        error: error.message
-      });
+      console.error('Test error:', error);
+      res.status(500).json({ success: false, message: 'Testing failed', error: error.message });
     }
   });
 }
-
-// Error handling middleware for this router
-router.use((error, req, res, next) => {
-  console.error('Admin router error:', error);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
-  });
-});
 
 module.exports = router;

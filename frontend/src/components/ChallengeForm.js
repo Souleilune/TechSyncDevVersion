@@ -142,61 +142,121 @@ const ChallengeForm = ({ onSuccess, onCancel, initialData = null }) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
+  e.preventDefault();
+  
+  if (!validateForm()) {
+    return;
+  }
+
+  setLoading(true);
+  setError('');
+  
+  try {
+    // Build challenge data with proper validation
+    const challengeData = {
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      difficulty_level: formData.difficulty_level,
+      test_cases: JSON.stringify(generateTestCasesJSON())
+    };
+
+    // Add programming_language_id (REQUIRED - must be valid integer)
+    const langId = parseInt(formData.programming_language_id);
+    if (!isNaN(langId) && langId > 0) {
+      challengeData.programming_language_id = langId;
+    } else {
+      setError('Please select a valid programming language');
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    setError('');
-    
-    try {
-      const challengeData = {
-        ...formData,
-        test_cases: JSON.stringify(generateTestCasesJSON()),
-        programming_language_id: parseInt(formData.programming_language_id),
-        project_id: formData.project_id || null
-      };
+    // Add optional fields only if they have valid values
+    const timeLimit = parseInt(formData.time_limit_minutes);
+    if (!isNaN(timeLimit) && timeLimit > 0) {
+      challengeData.time_limit_minutes = timeLimit;
+    }
 
-      let response;
-      if (initialData) {
-        // Update existing challenge
-        response = await ChallengeAPI.updateChallenge(initialData.id, challengeData);
-      } else {
-        // Create new challenge
-        response = await ChallengeAPI.createChallenge(challengeData);
+    // Add starter_code only if not empty
+    if (formData.starter_code && formData.starter_code.trim() !== '') {
+      challengeData.starter_code = formData.starter_code.trim();
+    }
+
+    // Add expected_solution only if not empty
+    if (formData.expected_solution && formData.expected_solution.trim() !== '') {
+      challengeData.expected_solution = formData.expected_solution.trim();
+    }
+
+    // Add project_id only if it's a valid UUID
+    if (formData.project_id && formData.project_id.trim() !== '') {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(formData.project_id)) {
+        challengeData.project_id = formData.project_id.trim();
       }
+    }
 
-      if (response.success) {
-        if (onSuccess) {
-          onSuccess(response.data.challenge);
-        }
-        
-        // Reset form if creating new challenge
-        if (!initialData) {
-          setFormData({
-            title: '',
-            description: '',
-            difficulty_level: 'easy',
-            time_limit_minutes: 30,
-            programming_language_id: '',
-            project_id: '',
-            starter_code: '',
-            expected_solution: '',
-            test_cases: ''
-          });
-          setTestCaseFields([{ input: '', expected_output: '' }]);
-        }
+    // Add is_active (default true)
+    challengeData.is_active = formData.is_active !== undefined ? formData.is_active : true;
+
+    console.log('Submitting challenge data:', challengeData);
+
+    let response;
+    if (initialData) {
+      // Update existing challenge
+      response = await ChallengeAPI.updateChallenge(initialData.id, challengeData);
+    } else {
+      // Create new challenge
+      response = await ChallengeAPI.createChallenge(challengeData);
+    }
+
+    if (response.success) {
+      if (onSuccess) {
+        onSuccess(response.data.challenge);
       }
       
-    } catch (error) {
-      console.error('Error submitting challenge:', error);
-      setError(error.response?.data?.message || 'Failed to save challenge');
-    } finally {
-      setLoading(false);
+      // Reset form if creating new challenge
+      if (!initialData) {
+        setFormData({
+          title: '',
+          description: '',
+          difficulty_level: 'easy',
+          time_limit_minutes: 30,
+          programming_language_id: '',
+          project_id: '',
+          starter_code: '',
+          expected_solution: '',
+          test_cases: '',
+          is_active: true
+        });
+        setTestCaseFields([{ input: '', expected_output: '' }]);
+      }
     }
-  };
+    
+  } catch (error) {
+    console.error('Error submitting challenge:', error);
+    
+    let errorMessage = 'Failed to submit challenge';
+    
+    // Handle validation errors
+    if (error.response?.status === 400) {
+      if (error.response?.data?.errors) {
+        const validationErrors = error.response.data.errors;
+        if (Array.isArray(validationErrors)) {
+          errorMessage = validationErrors.map(e => e.msg || e.message).join(', ');
+        }
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    setError(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const styles = {
     container: {

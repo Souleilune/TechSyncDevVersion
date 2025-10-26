@@ -250,35 +250,52 @@ const updateChallenge = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
+    const userRole = req.user.role;
     const updateData = req.body;
 
+    // Fetch existing challenge
     const { data: existingChallenge, error: findError } = await supabase
       .from('coding_challenges')
-      .select('id, created_by')
+      .select('id, created_by, title')
       .eq('id', id)
       .single();
 
     if (findError || !existingChallenge) {
-      return res.status(404).json({ success: false, message: 'Challenge not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Challenge not found' 
+      });
     }
 
-    if (existingChallenge.created_by !== userId) {
-      return res.status(403).json({ success: false, message: 'You can only update your own challenges' });
+    // FIXED: Allow admins/moderators to update any challenge
+    const isAdmin = userRole === 'admin' || userRole === 'moderator';
+    const isOwner = existingChallenge.created_by === userId;
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You can only update your own challenges' 
+      });
     }
 
+    // Parse test_cases if it's a string
     if (updateData.test_cases) {
       try {
         updateData.test_cases = typeof updateData.test_cases === 'string'
           ? JSON.parse(updateData.test_cases)
           : updateData.test_cases;
       } catch (error) {
-        return res.status(400).json({ success: false, message: 'Invalid test cases format' });
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Invalid test cases format' 
+        });
       }
     }
 
+    // FIXED: Remove updated_at from update (column doesn't exist in DB)
     const { data: challenge, error: updateError } = await supabase
       .from('coding_challenges')
-      .update({ ...updateData, updated_at: new Date().toISOString() })
+      .update(updateData)  // ✅ Just updateData, no updated_at
       .eq('id', id)
       .select(`
         *,
@@ -288,13 +305,26 @@ const updateChallenge = async (req, res) => {
       .single();
 
     if (updateError) {
-      return res.status(500).json({ success: false, message: 'Failed to update challenge', error: updateError.message });
+      console.error('Database update error:', updateError);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to update challenge', 
+        error: updateError.message 
+      });
     }
 
-    res.json({ success: true, message: 'Challenge updated successfully', data: { challenge } });
+    res.json({ 
+      success: true, 
+      message: 'Challenge updated successfully', 
+      data: { challenge } 
+    });
   } catch (error) {
     console.error('Update challenge error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error', 
+      error: error.message 
+    });
   }
 };
 
@@ -303,6 +333,7 @@ const deleteChallenge = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
+    const userRole = req.user.role;
 
     const { data: existingChallenge, error: findError } = await supabase
       .from('coding_challenges')
@@ -311,29 +342,50 @@ const deleteChallenge = async (req, res) => {
       .single();
 
     if (findError || !existingChallenge) {
-      return res.status(404).json({ success: false, message: 'Challenge not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Challenge not found' 
+      });
     }
 
-    if (existingChallenge.created_by !== userId) {
-      return res.status(403).json({ success: false, message: 'You can only delete your own challenges' });
+    // FIXED: Allow admins/moderators to delete any challenge
+    const isAdmin = userRole === 'admin' || userRole === 'moderator';
+    const isOwner = existingChallenge.created_by === userId;
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You can only delete your own challenges' 
+      });
     }
 
+    // FIXED: Soft delete without updated_at
     const { error: deleteError } = await supabase
       .from('coding_challenges')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .update({ is_active: false })  // ✅ No updated_at
       .eq('id', id);
 
     if (deleteError) {
-      return res.status(500).json({ success: false, message: 'Failed to delete challenge', error: deleteError.message });
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to delete challenge', 
+        error: deleteError.message 
+      });
     }
 
-    res.json({ success: true, message: `Challenge "${existingChallenge.title}" deleted successfully` });
+    res.json({ 
+      success: true, 
+      message: `Challenge "${existingChallenge.title}" deleted successfully` 
+    });
   } catch (error) {
     console.error('Delete challenge error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error', 
+      error: error.message 
+    });
   }
 };
-
 // Get challenges by programming language
 const getChallengesByLanguage = async (req, res) => {
   try {

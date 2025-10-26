@@ -530,17 +530,47 @@ const ChallengeManagement = () => {
   };
 
   const handleDelete = async (challengeId) => {
-    if (window.confirm('Are you sure you want to delete this challenge?')) {
-      try {
-        await ChallengeAPI.deleteChallenge(challengeId);
-        setChallenges(challenges.filter(c => c.id !== challengeId));
-        setError('');
-      } catch (error) {
-        console.error('Error deleting challenge:', error);
-        setError('Failed to delete challenge: ' + (error.response?.data?.message || error.message));
-      }
+  if (!window.confirm('Are you sure you want to delete this challenge? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    setError(''); // Clear any previous errors
+    
+    const response = await ChallengeAPI.deleteChallenge(challengeId);
+    
+    if (response.success) {
+      // Remove the deleted challenge from state
+      setChallenges(prevChallenges => prevChallenges.filter(c => c.id !== challengeId));
+      
+      // Show success message briefly
+      const successMessage = 'Challenge deleted successfully';
+      console.log(successMessage);
+      
+      // Optionally reload to ensure consistency
+      // setTimeout(() => loadChallenges(), 500);
+    } else {
+      throw new Error(response.message || 'Failed to delete challenge');
     }
-  };
+  } catch (error) {
+    console.error('Error deleting challenge:', error);
+    
+    let errorMessage = 'Failed to delete challenge';
+    
+    if (error.response?.data?.message) {
+      errorMessage += ': ' + error.response.data.message;
+    } else if (error.response?.data?.errors) {
+      const validationErrors = error.response.data.errors;
+      if (Array.isArray(validationErrors)) {
+        errorMessage += ': ' + validationErrors.map(e => e.msg || e.message).join(', ');
+      }
+    } else if (error.message) {
+      errorMessage += ': ' + error.message;
+    }
+    
+    setError(errorMessage);
+  }
+};
 
   const getDifficultyColor = (difficulty) => {
     const colors = {
