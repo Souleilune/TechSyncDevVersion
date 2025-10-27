@@ -1000,7 +1000,7 @@ const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
 
             <ChallengeHints
               rawTestCases={challenge.challenge?.test_cases}
-              failedAttempts={canAttempt?.failedAttemptsCount || 0}
+              failedAttempts={canAttempt?.failedAttempts || 0}
             />
 
             {/* Test Cases */}
