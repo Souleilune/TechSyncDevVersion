@@ -17,6 +17,11 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
   const [proficiencyLevel, setProficiencyLevel] = useState('intermediate');
   const [yearsExperience, setYearsExperience] = useState(0);
 
+  // Edit language states
+  const [editingLanguage, setEditingLanguage] = useState(null);
+  const [editProficiencyLevel, setEditProficiencyLevel] = useState('');
+  const [editYearsExperience, setEditYearsExperience] = useState(0);
+
   // Challenge modal states
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [currentChallenge, setCurrentChallenge] = useState(null);
@@ -49,6 +54,12 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
       return;
     }
 
+    console.log('🔍 Adding language:', {
+      selectedLanguage,
+      proficiencyLevel,
+      yearsExperience
+    });
+
     try {
       setLoading(true);
       setError('');
@@ -59,6 +70,8 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
         parseInt(selectedLanguage),
         proficiencyLevel
       );
+
+      console.log('✅ Challenge response:', response);
 
       if (response.success) {
         // Store the pending data and show challenge modal
@@ -72,7 +85,8 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
         setShowAddForm(false);
       }
     } catch (err) {
-      console.error('Error requesting language challenge:', err);
+      console.error('❌ Error requesting language challenge:', err);
+      console.error('Error details:', err.response?.data);
       setError(err.response?.data?.message || 'Failed to load challenge. Please try again.');
     } finally {
       setLoading(false);
@@ -123,6 +137,14 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
   };
 
   const handleRemoveLanguage = async (languageId) => {
+    console.log('handleRemoveLanguage called with:', languageId);
+    
+    if (!languageId) {
+      setError('Invalid language ID');
+      console.error('Language ID is undefined or null');
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to remove this programming language from your profile?')) {
       return;
     }
@@ -132,6 +154,7 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
       setError('');
       setSuccess('');
 
+      console.log('Calling removeLanguage API with ID:', languageId);
       const response = await ProfileUpdateAPI.removeLanguage(languageId);
       
       if (response.success) {
@@ -150,8 +173,59 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
     }
   };
 
+  const startEditLanguage = (userLang) => {
+    setEditingLanguage(userLang);
+    setEditProficiencyLevel(userLang.proficiency_level);
+    setEditYearsExperience(userLang.years_experience || 0);
+    setError('');
+    setSuccess('');
+  };
+
+  const cancelEditLanguage = () => {
+    setEditingLanguage(null);
+    setEditProficiencyLevel('');
+    setEditYearsExperience(0);
+  };
+
+  const handleUpdateLanguage = async () => {
+    if (!editingLanguage) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+
+      const response = await ProfileUpdateAPI.updateLanguageProficiency(
+        editingLanguage.language_id || editingLanguage.programming_languages?.id,
+        editProficiencyLevel,
+        editYearsExperience
+      );
+
+      if (response.success) {
+        setSuccess('Language updated successfully!');
+        setEditingLanguage(null);
+        onUpdate(); // Refresh parent component
+
+        setTimeout(() => {
+          setSuccess('');
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Error updating language:', err);
+      setError(err.response?.data?.message || 'Failed to update language');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getAvailableLanguages = () => {
-    const userLanguageIds = userLanguages.map(ul => ul.programming_languages?.id || ul.language_id);
+    // Get the language IDs that the user already has
+    const userLanguageIds = userLanguages.map(ul => {
+      // The language_id field contains the reference to programming_languages table
+      return ul.language_id || ul.programming_languages?.id;
+    }).filter(Boolean); // Remove any undefined values
+    
+    // Filter out languages that the user already has
     return allLanguages.filter(lang => !userLanguageIds.includes(lang.id));
   };
 
@@ -197,21 +271,102 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
                 <div style={styles.languagesList}>
                   {userLanguages.map((userLang) => (
                     <div key={userLang.id} style={styles.languageItem}>
-                      <div style={styles.languageInfo}>
-                        <span style={styles.languageName}>
-                          {userLang.programming_languages?.name || 'Unknown'}
-                        </span>
-                        <span style={styles.languageLevel}>
-                          {userLang.proficiency_level}
-                        </span>
-                      </div>
-                      <button
-                        style={styles.deleteButton}
-                        onClick={() => handleRemoveLanguage(userLang.language_id)}
-                        disabled={loading}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {editingLanguage && editingLanguage.id === userLang.id ? (
+                        // Edit Form
+                        <div style={styles.editForm}>
+                          <div style={styles.editFormHeader}>
+                            <span style={styles.languageName}>
+                              {userLang.programming_languages?.name || 'Unknown'}
+                            </span>
+                          </div>
+                          
+                          <div style={styles.editFormFields}>
+                            <div style={styles.formGroup}>
+                              <label style={styles.label}>Proficiency Level</label>
+                              <select
+                                style={styles.select}
+                                value={editProficiencyLevel}
+                                onChange={(e) => setEditProficiencyLevel(e.target.value)}
+                                disabled={loading}
+                              >
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="advanced">Advanced</option>
+                                <option value="expert">Expert</option>
+                              </select>
+                            </div>
+
+                            <div style={styles.formGroup}>
+                              <label style={styles.label}>Years of Experience</label>
+                              <input
+                                type="number"
+                                style={styles.input}
+                                value={editYearsExperience}
+                                onChange={(e) => setEditYearsExperience(Math.max(0, parseInt(e.target.value) || 0))}
+                                min="0"
+                                disabled={loading}
+                              />
+                            </div>
+                          </div>
+
+                          <div style={styles.editFormActions}>
+                            <button
+                              style={styles.cancelButton}
+                              onClick={cancelEditLanguage}
+                              disabled={loading}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              style={styles.submitButton}
+                              onClick={handleUpdateLanguage}
+                              disabled={loading}
+                            >
+                              {loading ? (
+                                <>
+                                  <Loader size={16} className="spinner" />
+                                  Updating...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle size={16} />
+                                  Save Changes
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // View Mode
+                        <>
+                          <div style={styles.languageInfo}>
+                            <span style={styles.languageName}>
+                              {userLang.programming_languages?.name || 'Unknown'}
+                            </span>
+                            <span style={styles.languageLevel}>
+                              {userLang.proficiency_level}
+                            </span>
+                          </div>
+                          <div style={styles.languageActions}>
+                            <button
+                              style={styles.editButton}
+                              onClick={() => startEditLanguage(userLang)}
+                              disabled={loading}
+                              title="Edit language"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              style={styles.deleteButton}
+                              onClick={() => handleRemoveLanguage(userLang.language_id || userLang.programming_languages?.id)}
+                              disabled={loading}
+                              title="Remove language"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -301,13 +456,13 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
                     >
                       {loading ? (
                         <>
-                          <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                          <Loader size={16} className="spinner" />
                           Loading Challenge...
                         </>
                       ) : (
                         <>
-                          <Code size={16} />
-                          Get Challenge
+                          <Plus size={16} />
+                          Start Challenge
                         </>
                       )}
                     </button>
@@ -323,12 +478,13 @@ const EditLanguagesModal = ({ isOpen, onClose, userLanguages, onUpdate }) => {
       {showChallengeModal && currentChallenge && (
         <ChallengeAttemptModal
           isOpen={showChallengeModal}
+          challenge={currentChallenge}
           onClose={() => {
             setShowChallengeModal(false);
             setCurrentChallenge(null);
             setPendingLanguageData(null);
+            setShowAddForm(true); // Show the add form again when closing challenge modal
           }}
-          challenge={currentChallenge}
           onComplete={handleChallengeComplete}
         />
       )}
@@ -343,27 +499,27 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    backdropFilter: 'blur(4px)'
+    padding: '20px'
   },
   modal: {
-    backgroundColor: '#1a1d29',
-    borderRadius: '16px',
-    width: '90%',
+    backgroundColor: '#0d1117',
+    borderRadius: '12px',
+    width: '100%',
     maxWidth: '600px',
     maxHeight: '90vh',
-    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    border: '1px solid rgba(59, 130, 246, 0.2)',
-    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+    border: '1px solid rgba(255, 255, 255, 0.1)'
   },
   header: {
-    padding: '20px 24px',
+    padding: '24px',
     borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
     display: 'flex',
     alignItems: 'center',
@@ -439,9 +595,26 @@ const styles = {
     padding: '4px 8px',
     borderRadius: '4px'
   },
+  languageActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  editButton: {
+    background: 'rgba(59, 130, 246, 0.2)',
+    border: '1px solid rgba(59, 130, 246, 0.3)',
+    color: '#60a5fa',
+    cursor: 'pointer',
+    padding: '8px',
+    borderRadius: '6px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s'
+  },
   deleteButton: {
-    background: 'transparent',
-    border: 'none',
+    background: 'rgba(239, 68, 68, 0.2)',
+    border: '1px solid rgba(239, 68, 68, 0.3)',
     color: '#ef4444',
     cursor: 'pointer',
     padding: '8px',
@@ -451,11 +624,27 @@ const styles = {
     justifyContent: 'center',
     transition: 'all 0.2s'
   },
+  editForm: {
+    width: '100%'
+  },
+  editFormHeader: {
+    marginBottom: '16px'
+  },
+  editFormFields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '16px'
+  },
+  editFormActions: {
+    display: 'flex',
+    gap: '12px'
+  },
   addButton: {
     width: '100%',
     padding: '12px',
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    border: '1px dashed rgba(59, 130, 246, 0.4)',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    border: '1px solid rgba(59, 130, 246, 0.3)',
     borderRadius: '8px',
     color: '#60a5fa',
     fontSize: '14px',
@@ -468,22 +657,22 @@ const styles = {
     transition: 'all 0.2s'
   },
   addForm: {
-    padding: '16px',
     backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    border: '1px solid rgba(255, 255, 255, 0.05)',
     borderRadius: '8px',
-    border: '1px solid rgba(255, 255, 255, 0.1)'
+    padding: '16px'
   },
   challengeInfo: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     fontSize: '13px',
-    color: '#fbbf24',
+    color: '#9ca3af',
     marginBottom: '16px',
-    padding: '8px 12px',
-    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    padding: '10px',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderRadius: '6px',
-    border: '1px solid rgba(251, 191, 36, 0.2)'
+    border: '1px solid rgba(59, 130, 246, 0.2)'
   },
   formGroup: {
     marginBottom: '16px'
