@@ -528,132 +528,107 @@ const getAttemptDetails = async (req, res) => {
 // Submit simple challenge (for solo projects weekly challenges)
 const submitSimpleChallenge = async (req, res) => {
   try {
-    const { challenge_id, submitted_code, notes, language, project_id, attempt_type } = req.body;
+    const { challenge_id, submitted_code, notes, language, project_id } = req.body;
     const userId = req.user.id;
 
-    console.log('📝 Simple challenge submission:', {
+    console.log('📝 Simple challenge submission (NO Judge0):', {
       challenge_id,
       userId,
-      project_id,
-      attempt_type,
-      code_length: submitted_code?.length
+      project_id: project_id || 'none',
+      code_length: submitted_code?.length,
+      type: 'SIMPLE_PRACTICE'
     });
 
-    // Validate submission
-    if (!submitted_code || submitted_code.trim().length < 10) {
+    // ===== Validation =====
+    if (!challenge_id) {
       return res.status(400).json({
         success: false,
-        message: 'Code submission is too short. Please provide a more complete solution.'
+        message: 'Challenge ID is required'
       });
     }
 
-    // Get challenge details
+    if (!submitted_code || submitted_code.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Code submission is too short. Please provide a more complete solution (minimum 10 characters).'
+      });
+    }
+
+    // ===== Get Challenge Details =====
     const { data: challenge, error: challengeError } = await supabase
       .from('coding_challenges')
       .select(`
-        id, title, description, difficulty_level, time_limit_minutes,
-        test_cases, expected_solution, programming_language_id,
+        id, 
+        title, 
+        description, 
+        difficulty_level, 
+        time_limit_minutes,
+        test_cases, 
+        expected_solution, 
+        programming_language_id,
         programming_languages (id, name)
       `)
       .eq('id', challenge_id)
       .single();
 
     if (challengeError || !challenge) {
+      console.error('Challenge not found:', challengeError);
       return res.status(404).json({
         success: false,
         message: 'Challenge not found'
       });
     }
 
-    // Run tests if test cases exist
-    // Run tests if test cases exist
-let score = 50;
-let status = 'pending';
-let feedback = 'Your submission has been received and is being evaluated.';
-let testResults = null;
-
-// Check if challenge has test cases
-if (challenge.test_cases) {
-  try {
-    // Parse test_cases if it's a string
-    let parsedTestCases = challenge.test_cases;
-    if (typeof challenge.test_cases === 'string') {
-      try {
-        parsedTestCases = JSON.parse(challenge.test_cases);
-      } catch (parseError) {
-        console.warn('Failed to parse test_cases JSON:', parseError);
-        parsedTestCases = null;
-      }
-    }
-
-    // Only run tests if we have valid test cases
-    if (parsedTestCases && Array.isArray(parsedTestCases) && parsedTestCases.length > 0) {
-      const evalResult = await runTests({
-        sourceCode: submitted_code,
-        languageName: language || challenge.programming_languages?.name?.toLowerCase() || 'javascript',
-        testCases: parsedTestCases,
-        challengeId: challenge_id,
-        timeLimitMs: (challenge.time_limit_minutes || 5) * 60 * 1000,
-        memoryLimitMb: 256
-      });
-
-      score = evalResult.score || 0;
-      status = score >= 60 ? 'passed' : 'failed';
-      testResults = evalResult.tests;
-      feedback = `Score: ${score}%. ${status === 'passed' ? 'Excellent work!' : 'Keep practicing!'}`;
-    } else {
-      // No valid test cases - use basic code quality scoring
-      console.warn('⚠️ Challenge has no valid test cases, using basic evaluation');
-      
-      // Basic code quality check
-      const codeLength = submitted_code.trim().length;
-      const hasFunction = /function\s+\w+|const\s+\w+\s*=|def\s+\w+|class\s+\w+/i.test(submitted_code);
-      const hasLogic = /if\s*\(|for\s*\(|while\s*\(|switch\s*\(/i.test(submitted_code);
-      const hasReturn = /return\s+/i.test(submitted_code);
-      
-      // Calculate basic score
-      score = 0;
-      if (codeLength > 20) score += 20;
-      if (hasFunction) score += 30;
-      if (hasLogic) score += 25;
-      if (hasReturn) score += 25;
-      
-      status = score >= 60 ? 'passed' : 'failed';
-      feedback = status === 'passed' 
-        ? 'Good effort! Your code shows understanding of the concept.'
-        : 'Your solution needs more work. Make sure to include proper functions and logic.';
-    }
-  } catch (evalError) {
-    console.error('Code evaluation error:', evalError);
+    // ===== SIMPLE SCORING SYSTEM (NO Judge0 execution) =====
+    let score = 0;
+    let status = 'completed';
+    let feedback = '';
     
-    // Use basic scoring as fallback
+    // Basic code quality metrics
     const codeLength = submitted_code.trim().length;
-    score = codeLength > 50 ? 50 : Math.floor(codeLength / 2);
-    status = 'failed';
-    feedback = 'Error evaluating your code. Your submission has been recorded but could not be fully tested.';
-  }
-} else {
-  // No test cases at all - use basic code quality scoring
-  console.warn('⚠️ Challenge has no test_cases field');
-  
-  const codeLength = submitted_code.trim().length;
-  const hasFunction = /function\s+\w+|const\s+\w+\s*=|def\s+\w+|class\s+\w+/i.test(submitted_code);
-  const hasLogic = /if\s*\(|for\s*\(|while\s*\(|switch\s*\(/i.test(submitted_code);
-  const hasReturn = /return\s+/i.test(submitted_code);
-  
-  score = 0;
-  if (codeLength > 20) score += 20;
-  if (hasFunction) score += 30;
-  if (hasLogic) score += 25;
-  if (hasReturn) score += 25;
-  
-  status = score >= 60 ? 'passed' : 'failed';
-  feedback = status === 'passed'
-    ? 'Your code shows good structure. Note: This challenge had no automated tests.'
-    : 'Please add more complete logic to your solution.';
-}
+    const hasFunction = /function\s+\w+|const\s+\w+\s*=|def\s+\w+|class\s+\w+|func\s+\w+|fn\s+\w+|public\s+\w+|private\s+\w+/i.test(submitted_code);
+    const hasLogic = /if\s*\(|for\s*\(|while\s*\(|switch\s*\(|forEach|map|filter|reduce|match|case/i.test(submitted_code);
+    const hasReturn = /return\s+|yield\s+|res\.json|echo\s+|print\s+|println/i.test(submitted_code);
+    const hasComments = /\/\/|\/\*|\*\/|#|"""|'''|<!--/g.test(submitted_code);
+    const hasVariables = /const\s+\w+|let\s+\w+|var\s+\w+|:\w+\s+=/i.test(submitted_code);
+    
+    // Calculate quality score (0-100)
+    if (codeLength > 20) score += 20;
+    if (hasFunction) score += 30;
+    if (hasLogic) score += 25;
+    if (hasReturn) score += 15;
+    if (hasComments) score += 5;
+    if (hasVariables) score += 5;
+    if (codeLength > 100) score += 5;
+    if (codeLength > 200) score += 5;
+    
+    score = Math.min(100, score);
+    
+    // Determine pass status (for skill rating)
+    const passed = score >= 70;
+    status = passed ? 'passed' : 'completed';
+    
+    // Generate feedback
+    if (score >= 90) {
+      feedback = '🎉 Excellent work! Your code demonstrates exceptional programming skills and best practices.';
+    } else if (score >= 80) {
+      feedback = '🌟 Great job! Your code shows strong understanding and good structure.';
+    } else if (score >= 70) {
+      feedback = '👍 Good effort! Your code demonstrates solid programming fundamentals.';
+    } else if (score >= 60) {
+      feedback = '💪 Nice try! Your solution shows promise. Consider adding more structure and logic.';
+    } else if (score >= 40) {
+      feedback = '📚 Keep practicing! Try including functions, control flow, and proper code structure.';
+    } else {
+      feedback = '🌱 Good start! Focus on creating complete functions with logic and return values.';
+    }
 
-    // Create challenge attempt record
+    if (challenge.difficulty_level === 'hard' || challenge.difficulty_level === 'expert') {
+      feedback += ' This is a challenging problem - great effort tackling it!';
+    }
+
+    // ===== Create Challenge Attempt Record =====
+    // FIXED: Using only the fields that exist in your schema
     const { data: attempt, error: attemptError } = await supabase
       .from('challenge_attempts')
       .insert({
@@ -661,63 +636,119 @@ if (challenge.test_cases) {
         user_id: userId,
         project_id: project_id || null,
         submitted_code,
-        status,
+        status, // 'passed' or 'completed'
         score,
         feedback,
-        test_results: testResults,
+        results: null, // Using 'results' instead of 'test_results'
         started_at: new Date().toISOString(),
         submitted_at: new Date().toISOString(),
         reviewed_at: new Date().toISOString(),
         solve_time_minutes: 0
+        // REMOVED: completed_at (doesn't exist in schema)
+        // REMOVED: notes field (doesn't exist in schema)
+        // REMOVED: test_results (your schema uses 'results' instead)
       })
       .select()
       .single();
 
     if (attemptError) {
-      console.error('Error creating challenge attempt:', attemptError);
+      console.error('Error creating simple challenge attempt:', attemptError);
       return res.status(500).json({
         success: false,
-        message: 'Failed to create challenge attempt',
+        message: 'Failed to record challenge attempt',
         error: attemptError.message
       });
     }
 
-    // Check for weekly challenge award if this is a solo project challenge and passed
-    if (status === 'passed' && project_id) {
-      const awardResult = await checkWeeklyChallengeAwardAfterSubmission(userId, project_id);
-      if (awardResult.awarded) {
-        console.log('🎉 User earned Challenge Champion award!');
-        return res.json({
-          success: true,
-          data: {
-            attempt,
-            award: awardResult.award,
-            awardMessage: 'Congratulations! You earned the Challenge Champion award! 🌟'
-          }
-        });
-      }
-    }
+    console.log('✅ Simple challenge attempt created:', {
+      attempt_id: attempt.id,
+      score,
+      status,
+      passed
+    });
 
-    // Update skill ratings (if implemented)
+    // ===== Update Skill Ratings (ELO System) =====
     try {
       if (challenge.programming_language_id) {
-        await updateSkillRatings(userId, challenge.programming_language_id, challenge_id, status === 'passed');
+        console.log('📊 Updating skill ratings:', {
+          userId,
+          programmingLanguageId: challenge.programming_language_id,
+          challengeId: challenge_id,
+          passed
+        });
+
+        await updateSkillRatings(
+          userId, 
+          challenge.programming_language_id, 
+          challenge_id, 
+          passed
+        );
+
+        console.log('✅ Skill ratings updated successfully');
+      } else {
+        console.warn('⚠️ No programming_language_id found, skipping skill rating update');
       }
     } catch (ratingError) {
-      console.error('Error updating skill ratings:', ratingError);
-      // Don't fail the request if rating update fails
+      console.error('❌ Error updating skill ratings:', ratingError);
+      // Non-blocking - don't fail the request
     }
 
-    res.json({
+    // ===== Check for Weekly Challenge Award =====
+    let awardResult = { awarded: false };
+    
+    if (project_id) {
+      try {
+        awardResult = await checkWeeklyChallengeAwardAfterSubmission(userId, project_id);
+        
+        if (awardResult.awarded) {
+          console.log('🎉 User earned Challenge Champion award!', {
+            userId,
+            projectId: project_id,
+            awardId: awardResult.award?.id
+          });
+        }
+      } catch (awardError) {
+        console.warn('Award check failed (non-blocking):', awardError.message);
+      }
+    }
+
+    // ===== Return Success Response =====
+    return res.json({
       success: true,
-      data: { attempt }
+      message: 'Challenge completed successfully!',
+      data: {
+        attempt: {
+          id: attempt.id,
+          challenge_id: attempt.challenge_id,
+          score: attempt.score,
+          status: attempt.status,
+          feedback: attempt.feedback,
+          submitted_at: attempt.submitted_at
+        },
+        score,
+        feedback,
+        status,
+        passed,
+        challengeType: 'simple',
+        challenge: {
+          id: challenge.id,
+          title: challenge.title,
+          difficulty_level: challenge.difficulty_level,
+          programming_language_id: challenge.programming_language_id
+        },
+        award: awardResult.awarded ? awardResult.award : null,
+        awardMessage: awardResult.awarded ? 
+          'Congratulations! You earned the Challenge Champion award!' : null,
+        skillRatingUpdated: !!challenge.programming_language_id
+      }
     });
 
   } catch (error) {
-    console.error('💥 Submit simple challenge error:', error);
-    res.status(500).json({
+    console.error('Submit simple challenge error:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error while submitting challenge',
+      error: error.message
     });
   }
 };

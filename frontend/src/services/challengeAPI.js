@@ -70,6 +70,29 @@ class ChallengeAPI {
     }
   }
 
+  static async submitSimpleChallenge(attemptData) {
+    try {
+      const response = await api.post('/challenges/submit', attemptData);
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting simple challenge:', error);
+      throw error;
+    }
+  }
+
+  // Project recruitment challenge (WITH Judge0)
+  static async submitChallengeAttempt(projectId, attemptData) {
+    try {
+      const response = await api.post(
+        `/challenges/project/${projectId}/attempt`, 
+        attemptData
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting challenge attempt:', error);
+      throw error;
+    }
+  }
   /**
    * Admin: Create a new challenge (admin route)
    * @param {Object} challengeData - Challenge data

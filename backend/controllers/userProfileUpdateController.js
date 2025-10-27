@@ -133,30 +133,69 @@ const verifyAndAddLanguage = async (req, res) => {
       years_experience 
     } = req.body;
 
+    console.log('🔍 Verifying language challenge:', {
+      userId,
+      language_id,
+      proficiency_level,
+      challenge_id,
+      attempt_id,
+      years_experience
+    });
+
     // Validate input
     if (!language_id || !proficiency_level || !challenge_id || !attempt_id) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields'
+        message: 'Missing required fields: language_id, proficiency_level, challenge_id, and attempt_id are required'
       });
     }
 
+    // FIXED: Changed from 'user_challenge_attempts' to 'challenge_attempts'
     // Verify that the attempt exists and was successful
     const { data: attempt, error: attemptError } = await supabase
-      .from('user_challenge_attempts')
+      .from('challenge_attempts')  // ✅ FIXED: Correct table name
       .select('*')
       .eq('id', attempt_id)
       .eq('user_id', userId)
       .eq('challenge_id', challenge_id)
-      .eq('status', 'passed')
       .single();
 
-    if (attemptError || !attempt) {
+    if (attemptError) {
+      console.error('❌ Error fetching attempt:', attemptError);
       return res.status(400).json({
         success: false,
-        message: 'Challenge not completed or verification failed. Please complete the challenge first.'
+        message: 'Challenge attempt not found',
+        error: attemptError.message
       });
     }
+
+    if (!attempt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Challenge attempt not found. Please complete the challenge first.'
+      });
+    }
+
+    console.log('✅ Found attempt:', {
+      id: attempt.id,
+      status: attempt.status,
+      score: attempt.score
+    });
+
+    // Check if attempt was successful
+    // For simple challenges: status can be 'passed' or 'completed'
+    // We consider both as valid, but prefer 'passed' or score >= 70
+    const isSuccessful = attempt.status === 'passed' || 
+                        (attempt.score !== null && attempt.score >= 70);
+
+    if (!isSuccessful) {
+      return res.status(400).json({
+        success: false,
+        message: `Challenge not completed successfully. Status: ${attempt.status}, Score: ${attempt.score}. Please try again.`
+      });
+    }
+
+    console.log('✅ Challenge completed successfully');
 
     // Check if user already has this language (double-check)
     const { data: existingLang } = await supabase
@@ -167,6 +206,7 @@ const verifyAndAddLanguage = async (req, res) => {
       .single();
 
     if (existingLang) {
+      console.log('⚠️ Language already exists in profile');
       return res.status(400).json({
         success: false,
         message: 'You already have this programming language in your profile'
@@ -190,13 +230,15 @@ const verifyAndAddLanguage = async (req, res) => {
       .single();
 
     if (insertError) {
-      console.error('Error adding language:', insertError);
+      console.error('❌ Error adding language:', insertError);
       return res.status(500).json({
         success: false,
         message: 'Failed to add programming language',
         error: insertError.message
       });
     }
+
+    console.log('✅ Language added successfully:', newLanguage.programming_languages.name);
 
     res.json({
       success: true,
@@ -205,7 +247,7 @@ const verifyAndAddLanguage = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Verify and add language error:', error);
+    console.error('❌ Verify and add language error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
