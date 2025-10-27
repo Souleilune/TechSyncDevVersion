@@ -11,6 +11,57 @@ import AIChatInterface from '../components/AIChat/AIChatInterface';
 import ProjectChallengeInterface from '../components/ProjectChallengeInterface'; // ADD THIS IMPORT
 import { Plus, Bell, Rocket, Code, Users, BookOpen, HelpCircle, LockKeyhole, PanelLeft } from 'lucide-react';
 
+const formatSkillsDescription = (user) => {
+  if (!user) return 'Complete your profile to get personalized recommendations!';
+  
+  // Get programming languages
+  const languages = user.programming_languages || [];
+  const languageNames = languages
+    .map(l => l.programming_languages?.name || l.name)
+    .filter(Boolean)
+    .slice(0, 3); // Show first 3 languages
+  
+  // Get topics
+  const topics = user.topics || [];
+  const topicNames = topics
+    .map(t => t.topics?.name || t.name)
+    .filter(Boolean)
+    .slice(0, 3); // Show first 3 topics
+  
+  // Build the description
+  let description = 'Based on your skills';
+  
+  if (languageNames.length > 0) {
+    if (languageNames.length === 1) {
+      description += ` in ${languageNames[0]}`;
+    } else if (languageNames.length === 2) {
+      description += ` in ${languageNames[0]} and ${languageNames[1]}`;
+    } else {
+      description += ` in ${languageNames.slice(0, -1).join(', ')}, and ${languageNames[languageNames.length - 1]}`;
+    }
+  }
+  
+  if (topicNames.length > 0) {
+    description += ' and your interest in ';
+    if (topicNames.length === 1) {
+      description += topicNames[0];
+    } else if (topicNames.length === 2) {
+      description += `${topicNames[0]} and ${topicNames[1]}`;
+    } else {
+      description += `${topicNames.slice(0, -1).join(', ')}, and ${topicNames[topicNames.length - 1]}`;
+    }
+  }
+  
+  description += ', here are some projects you might like.';
+  
+  // If user has no languages or topics, show a different message
+  if (languageNames.length === 0 && topicNames.length === 0) {
+    return 'Complete your profile with programming languages and interests to get personalized project recommendations!';
+  }
+  
+  return description;
+};
+
 // Enhanced Project Card Component with subtle themed colors
 const EnhancedProjectCard = ({
   project,
@@ -815,27 +866,61 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const fetchRecommendations = async () => {
-      if (!user?.id) return;
+  const fetchRecommendations = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoadingRecommendations(true);
       
-      try {
-        setLoadingRecommendations(true);
-        const response = await SkillMatchingAPI.getEnhancedRecommendations(user.id);
-        const recommendations = response.data.recommendations;
-        
-        setRecommendedProjects(recommendations.slice(0, 12));
-        setFilteredProjects(recommendations.slice(0, 12));
-      } catch (error) {
-        console.error('Error fetching recommendations:', error);
-        setRecommendedProjects([]);
-        setFilteredProjects([]);
-      } finally {
-        setLoadingRecommendations(false);
-      }
-    };
+      // Just fetch recommendations directly
+      const response = await SkillMatchingAPI.getEnhancedRecommendations(user.id);
+      const recommendations = response.data.recommendations;
+      
+      setRecommendedProjects(recommendations.slice(0, 12));
+      setFilteredProjects(recommendations.slice(0, 12));
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      setRecommendedProjects([]);
+      setFilteredProjects([]);
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  };
 
-    fetchRecommendations();
-  }, [user?.id]);
+  fetchRecommendations();
+}, [user?.id, user?.programming_languages, user?.topics]);
+
+useEffect(() => {
+  const handleProfileUpdate = () => {
+    console.log('Profile updated, refreshing recommendations...');
+    // Trigger a re-fetch of recommendations
+    if (user?.id) {
+      const fetchRecommendations = async () => {
+        try {
+          setLoadingRecommendations(true);
+          const response = await SkillMatchingAPI.getEnhancedRecommendations(user.id);
+          const recommendations = response.data.recommendations;
+          
+          setRecommendedProjects(recommendations.slice(0, 12));
+          setFilteredProjects(recommendations.slice(0, 12));
+        } catch (error) {
+          console.error('Error fetching recommendations:', error);
+        } finally {
+          setLoadingRecommendations(false);
+        }
+      };
+      
+      fetchRecommendations();
+    }
+  };
+
+  // Listen for custom profile update event
+  window.addEventListener('profileUpdated', handleProfileUpdate);
+  
+  return () => {
+    window.removeEventListener('profileUpdated', handleProfileUpdate);
+  };
+}, [user?.id]);
 
   // NEW: Listen for AI chat project preview events
   useEffect(() => {
@@ -1984,8 +2069,9 @@ function Dashboard() {
                   Recommended Projects
                 </h3>
                 <p style={styles.sectionDescription}>
-                  Based on your skills in {user?.programming_languages?.slice(0, 2).map(l => l.programming_languages?.name || l.name).join(', ')} and your interest in {user?.topics?.slice(0, 2).map(t => t.topics?.name || t.name).join(', ')}, here are some projects you might like.
+                  {formatSkillsDescription(user)}
                 </p>
+
 
                 {/* Filter and Sort Section */}
                 {!loadingRecommendations && recommendedProjects.length > 0 && (

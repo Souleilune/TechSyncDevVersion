@@ -1,6 +1,6 @@
 // frontend/src/components/EditTopicsModal.js
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Target, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Target, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { onboardingService } from '../services/onboardingService';
 import ProfileUpdateAPI from '../services/profileUpdateAPI';
 
@@ -15,6 +15,11 @@ const EditTopicsModal = ({ isOpen, onClose, userTopics, onUpdate }) => {
   const [selectedTopic, setSelectedTopic] = useState('');
   const [interestLevel, setInterestLevel] = useState('medium');
   const [experienceLevel, setExperienceLevel] = useState('beginner');
+
+  // Edit topic states
+  const [editingTopic, setEditingTopic] = useState(null);
+  const [editInterestLevel, setEditInterestLevel] = useState('');
+  const [editExperienceLevel, setEditExperienceLevel] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -104,8 +109,56 @@ const EditTopicsModal = ({ isOpen, onClose, userTopics, onUpdate }) => {
     }
   };
 
+  const startEditTopic = (userTopic) => {
+    setEditingTopic(userTopic);
+    setEditInterestLevel(userTopic.interest_level);
+    setEditExperienceLevel(userTopic.experience_level);
+    setError('');
+    setSuccess('');
+  };
+
+  const cancelEditTopic = () => {
+    setEditingTopic(null);
+    setEditInterestLevel('');
+    setEditExperienceLevel('');
+  };
+
+  const handleUpdateTopic = async () => {
+    if (!editingTopic) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+
+      const response = await ProfileUpdateAPI.updateTopicInterest(
+        editingTopic.topic_id || editingTopic.topics?.id,
+        editInterestLevel,
+        editExperienceLevel
+      );
+
+      if (response.success) {
+        setSuccess('Topic updated successfully!');
+        setEditingTopic(null);
+        onUpdate(); // Refresh parent component
+
+        setTimeout(() => {
+          setSuccess('');
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Error updating topic:', err);
+      setError(err.response?.data?.message || 'Failed to update topic');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getAvailableTopics = () => {
-    const userTopicIds = userTopics.map(ut => ut.topics?.id || ut.topic_id);
+    const userTopicIds = userTopics.map(ut => {
+      return ut.topic_id || ut.topics?.id;
+    }).filter(Boolean);
+    
     return allTopics.filter(topic => !userTopicIds.includes(topic.id));
   };
 
@@ -163,32 +216,115 @@ const EditTopicsModal = ({ isOpen, onClose, userTopics, onUpdate }) => {
               <div style={styles.topicsList}>
                 {userTopics.map((userTopic) => (
                   <div key={userTopic.id} style={styles.topicItem}>
-                    <div style={styles.topicInfo}>
-                      <span style={styles.topicName}>
-                        {userTopic.topics?.name || 'Unknown'}
-                      </span>
-                      <div style={styles.topicLevels}>
-                        <span 
-                          style={{
-                            ...styles.topicLevel,
-                            borderColor: getInterestLevelColor(userTopic.interest_level),
-                            color: getInterestLevelColor(userTopic.interest_level)
-                          }}
-                        >
-                          {userTopic.interest_level}
-                        </span>
-                        <span style={styles.topicExperience}>
-                          {userTopic.experience_level}
-                        </span>
+                    {editingTopic && editingTopic.id === userTopic.id ? (
+                      // Edit Form
+                      <div style={styles.editForm}>
+                        <div style={styles.editFormHeader}>
+                          <span style={styles.topicName}>
+                            {userTopic.topics?.name || 'Unknown'}
+                          </span>
+                        </div>
+                        
+                        <div style={styles.editFormFields}>
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Interest Level</label>
+                            <select
+                              style={styles.select}
+                              value={editInterestLevel}
+                              onChange={(e) => setEditInterestLevel(e.target.value)}
+                              disabled={loading}
+                            >
+                              <option value="low">Low</option>
+                              <option value="medium">Medium</option>
+                              <option value="high">High</option>
+                            </select>
+                          </div>
+
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Experience Level</label>
+                            <select
+                              style={styles.select}
+                              value={editExperienceLevel}
+                              onChange={(e) => setEditExperienceLevel(e.target.value)}
+                              disabled={loading}
+                            >
+                              <option value="beginner">Beginner</option>
+                              <option value="intermediate">Intermediate</option>
+                              <option value="advanced">Advanced</option>
+                              <option value="expert">Expert</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={styles.editFormActions}>
+                          <button
+                            style={styles.cancelButton}
+                            onClick={cancelEditTopic}
+                            disabled={loading}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            style={styles.submitButton}
+                            onClick={handleUpdateTopic}
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <>
+                                <Loader size={16} className="spinner" />
+                                Updating...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle size={16} />
+                                Save Changes
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <button
-                      style={styles.deleteButton}
-                      onClick={() => handleRemoveTopic(userTopic.topic_id)}
-                      disabled={loading}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    ) : (
+                      // View Mode
+                      <>
+                        <div style={styles.topicInfo}>
+                          <span style={styles.topicName}>
+                            {userTopic.topics?.name || 'Unknown'}
+                          </span>
+                          <div style={styles.topicLevels}>
+                            <span 
+                              style={{
+                                ...styles.topicLevel,
+                                borderColor: getInterestLevelColor(userTopic.interest_level),
+                                color: getInterestLevelColor(userTopic.interest_level)
+                              }}
+                            >
+                              {userTopic.interest_level}
+                            </span>
+                            <span style={styles.topicExperience}>
+                              {userTopic.experience_level}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={styles.topicActions}>
+                          <button
+                            style={styles.editButton}
+                            onClick={() => startEditTopic(userTopic)}
+                            disabled={loading}
+                            title="Edit topic"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            style={styles.deleteButton}
+                            onClick={() => handleRemoveTopic(userTopic.topic_id || userTopic.topics?.id)}
+                            disabled={loading}
+                            title="Remove topic"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -276,7 +412,7 @@ const EditTopicsModal = ({ isOpen, onClose, userTopics, onUpdate }) => {
                   >
                     {loading ? (
                       <>
-                        <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                        <Loader size={16} className="spinner" />
                         Adding...
                       </>
                     ) : (
@@ -303,27 +439,27 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    backdropFilter: 'blur(4px)'
+    padding: '20px'
   },
   modal: {
-    backgroundColor: '#1a1d29',
-    borderRadius: '16px',
-    width: '90%',
+    backgroundColor: '#0d1117',
+    borderRadius: '12px',
+    width: '100%',
     maxWidth: '600px',
     maxHeight: '90vh',
-    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    border: '1px solid rgba(16, 185, 129, 0.2)',
-    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+    border: '1px solid rgba(255, 255, 255, 0.1)'
   },
   header: {
-    padding: '20px 24px',
+    padding: '24px',
     borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
     display: 'flex',
     alignItems: 'center',
@@ -412,9 +548,26 @@ const styles = {
     borderRadius: '4px',
     textTransform: 'capitalize'
   },
+  topicActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  editButton: {
+    background: 'rgba(16, 185, 129, 0.2)',
+    border: '1px solid rgba(16, 185, 129, 0.3)',
+    color: '#34d399',
+    cursor: 'pointer',
+    padding: '8px',
+    borderRadius: '6px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s'
+  },
   deleteButton: {
-    background: 'transparent',
-    border: 'none',
+    background: 'rgba(239, 68, 68, 0.2)',
+    border: '1px solid rgba(239, 68, 68, 0.3)',
     color: '#ef4444',
     cursor: 'pointer',
     padding: '8px',
@@ -423,6 +576,22 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s'
+  },
+  editForm: {
+    width: '100%'
+  },
+  editFormHeader: {
+    marginBottom: '16px'
+  },
+  editFormFields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '16px'
+  },
+  editFormActions: {
+    display: 'flex',
+    gap: '12px'
   },
   addButton: {
     width: '100%',
@@ -444,7 +613,7 @@ const styles = {
     padding: '16px',
     backgroundColor: 'rgba(255, 255, 255, 0.02)',
     borderRadius: '8px',
-    border: '1px solid rgba(255, 255, 255, 0.1)'
+    border: '1px solid rgba(255, 255, 255, 0.05)'
   },
   formGroup: {
     marginBottom: '16px'
