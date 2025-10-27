@@ -1,3 +1,4 @@
+// frontend/src/components/Notifications/NotificationDropdown.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import NotificationItem from './NotificationItem';
@@ -23,12 +24,14 @@ const NotificationDropdown = ({ onClose }) => {
             if (clearError) clearError();
             await fetchNotifications({ limit: 20 });
         } catch (error) {
+            console.error('Failed to load notifications:', error);
             setLocalError('Failed to load notifications');
         }
     }, [fetchNotifications, clearError]);
 
-    // Now loadNotifications is stable and can be used in useEffect
+    // Load notifications when component mounts
     useEffect(() => {
+        console.log('NotificationDropdown mounted, loading notifications...');
         loadNotifications();
     }, [loadNotifications]);
 
@@ -38,11 +41,19 @@ const NotificationDropdown = ({ onClose }) => {
             if (clearError) clearError();
             await markAllAsRead();
         } catch (error) {
+            console.error('Failed to mark notifications as read:', error);
             setLocalError('Failed to mark notifications as read');
         }
     };
 
     const displayError = localError || error;
+
+    console.log('NotificationDropdown render:', {
+        loading,
+        notificationsCount: notifications?.length || 0,
+        unreadCount,
+        displayError
+    });
 
     return (
         <div className="notification-dropdown">
@@ -115,7 +126,6 @@ const NotificationDropdown = ({ onClose }) => {
                 <div className="notification-dropdown-footer">
                     <button 
                         onClick={() => {
-                            // Navigate to a full notifications page if you have one
                             console.log('Navigate to all notifications');
                             onClose();
                         }}

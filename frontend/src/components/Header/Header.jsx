@@ -1,3 +1,4 @@
+// frontend/src/components/Header/Header.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -96,7 +97,21 @@ const Header = ({ title, actions = [] }) => {
               aria-label="Notifications"
               type="button"
             >
-              🔔
+              {/* Bell Icon SVG */}
+              <svg 
+                width="20" 
+                height="20" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              
               {unreadCount > 0 && (
                 <span className="notification-badge">
                   {unreadCount > 99 ? '99+' : unreadCount}
@@ -104,10 +119,27 @@ const Header = ({ title, actions = [] }) => {
               )}
             </button>
 
+            {/* Notification Dropdown - Positioned absolutely with backdrop */}
             {showNotifications && (
-              <div className="notification-dropdown-wrapper">
-                <NotificationDropdown onClose={() => setShowNotifications(false)} />
-              </div>
+              <>
+                {/* Backdrop overlay for better focus */}
+                <div 
+                  className="notification-backdrop"
+                  onClick={() => setShowNotifications(false)}
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 9998,
+                    background: 'transparent'
+                  }}
+                />
+                <div className="notification-dropdown-wrapper">
+                  <NotificationDropdown onClose={() => setShowNotifications(false)} />
+                </div>
+              </>
             )}
           </div>
 
@@ -131,53 +163,26 @@ const Header = ({ title, actions = [] }) => {
             {showUserMenu && (
               <div className="user-dropdown">
                 <div className="user-dropdown-header">
+                  <div className="user-avatar-large">
+                    {user?.full_name?.charAt(0)?.toUpperCase() || 
+                     user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                  </div>
                   <div className="user-info">
-                    <div className="user-avatar-large">
-                      {user?.full_name?.charAt(0)?.toUpperCase() || 
-                       user?.username?.charAt(0)?.toUpperCase() || 'U'}
-                    </div>
-                    <div className="user-details">
-                      <div className="user-display-name">
-                        {user?.full_name || user?.username || 'User'}
-                      </div>
-                      <div className="user-email">
-                        {user?.email}
-                      </div>
-                    </div>
+                    <div className="user-full-name">{user?.full_name || 'User'}</div>
+                    <div className="user-email">{user?.email || ''}</div>
                   </div>
                 </div>
 
-                <div className="user-dropdown-content">
-                  <button
-                    className="dropdown-item"
-                    onClick={handleProfileClick}
-                  >
-                    👤 Profile
+                <div className="user-dropdown-menu">
+                  <button onClick={handleProfileClick} className="user-dropdown-item">
+                    <span>👤</span> Profile
                   </button>
-                  <button
-                    className="dropdown-item"
-                    onClick={() => {
-                      navigate('/');
-                      setShowUserMenu(false);
-                    }}
-                  >
-                    🏠 Dashboard
+                  <button onClick={() => { navigate('/settings'); setShowUserMenu(false); }} className="user-dropdown-item">
+                    <span>⚙️</span> Settings
                   </button>
-                  <button
-                    className="dropdown-item"
-                    onClick={() => {
-                      navigate('/projects');
-                      setShowUserMenu(false);
-                    }}
-                  >
-                    📁 Projects
-                  </button>
-                  <div className="dropdown-divider"></div>
-                  <button
-                    className="dropdown-item logout"
-                    onClick={handleLogout}
-                  >
-                    🚪 Logout
+                  <div className="user-dropdown-divider"></div>
+                  <button onClick={handleLogout} className="user-dropdown-item danger">
+                    <span>🚪</span> Logout
                   </button>
                 </div>
               </div>

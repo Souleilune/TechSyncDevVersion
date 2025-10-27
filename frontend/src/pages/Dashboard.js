@@ -1302,7 +1302,7 @@ useEffect(() => {
     },
     welcomeSection: {
       position: 'relative',
-      zIndex: 10,
+      zIndex: 1,
       marginBottom: '30px'
     },
     welcomeTitle: {
@@ -1322,7 +1322,7 @@ useEffect(() => {
     },
     tabNavigation: {
       position: 'relative',
-      zIndex: 10,
+      zIndex: 1,
       marginBottom: '20px'
     },
     tabHeader: {
@@ -2003,7 +2003,7 @@ useEffect(() => {
                     top: '100%',
                     right: 0,
                     marginTop: '5px',
-                    zIndex: 1000
+                    zIndex: 9999
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
