@@ -305,46 +305,78 @@ function CreateProject({ onClose }) {
   };
 
   const handleSubmit = async () => {
-    if (isSubmitting) return;
-    
-    setIsSubmitting(true);
-    setErrors([]);
-    
-    try {
-      const projectData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        detailed_description: formData.detailed_description?.trim() || null,
-        required_experience_level: formData.required_experience_level || null,
-        maximum_members: formData.maximum_members ? parseInt(formData.maximum_members) : null,
-        estimated_duration_weeks: formData.estimated_duration_weeks ? parseInt(formData.estimated_duration_weeks) : null,
-        difficulty_level: formData.difficulty_level || null,
-        github_repo_url: formData.github_repo_url?.trim() || undefined,
-        deadline: formData.deadline || undefined,
-        programming_languages: formData.selectedLanguages.filter(lang => lang && lang.name).map(lang => lang.name),
-        topics: formData.selectedTopics.filter(topic => topic && topic.name).map(topic => topic.name)
-      };
+  if (isSubmitting) return;
+  
+  setIsSubmitting(true);
+  setErrors([]);
+  
+  try {
+    // ✅ FIX: Build projectData object conditionally - only include fields that have values
+    const projectData = {
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+    };
 
-      const response = await projectService.createProject(projectData);
-      
-      if (response.success) {
-        onClose();
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Project creation error:', error);
-      
-      if (error.response?.data?.errors) {
-        setErrors(error.response.data.errors.map(err => err.msg));
-      } else if (error.response?.data?.message) {
-        setErrors([error.response.data.message]);
-      } else {
-        setErrors(['Failed to create project. Please try again.']);
-      }
-    } finally {
-      setIsSubmitting(false);
+    // Add optional fields ONLY if they have actual values
+    if (formData.detailed_description?.trim()) {
+      projectData.detailed_description = formData.detailed_description.trim();
     }
-  };
+
+    if (formData.required_experience_level) {
+      projectData.required_experience_level = formData.required_experience_level;
+    }
+
+    if (formData.maximum_members) {
+      projectData.maximum_members = parseInt(formData.maximum_members);
+    }
+
+    if (formData.estimated_duration_weeks) {
+      projectData.estimated_duration_weeks = parseInt(formData.estimated_duration_weeks);
+    }
+
+    if (formData.difficulty_level) {
+      projectData.difficulty_level = formData.difficulty_level;
+    }
+
+    if (formData.github_repo_url?.trim()) {
+      projectData.github_repo_url = formData.github_repo_url.trim();
+    }
+
+    if (formData.deadline) {
+      projectData.deadline = formData.deadline;
+    }
+
+    // Always include these arrays (can be empty)
+    projectData.programming_languages = formData.selectedLanguages
+      .filter(lang => lang && lang.name)
+      .map(lang => lang.name);
+    
+    projectData.topics = formData.selectedTopics
+      .filter(topic => topic && topic.name)
+      .map(topic => topic.name);
+
+    console.log('📤 Sending project data:', projectData);
+
+    const response = await projectService.createProject(projectData);
+    
+    if (response.success) {
+      onClose();
+      window.location.reload();
+    }
+  } catch (error) {
+    console.error('Project creation error:', error);
+    
+    if (error.response?.data?.errors) {
+      setErrors(error.response.data.errors.map(err => err.msg));
+    } else if (error.response?.data?.message) {
+      setErrors([error.response.data.message]);
+    } else {
+      setErrors(['Failed to create project. Please try again.']);
+    }
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const styles = {
     overlay: {
@@ -757,6 +789,7 @@ function CreateProject({ onClose }) {
                 />
                 <div style={styles.characterCount}>
                   {formData.description.length}/500 characters
+                  Please input atleast 10 characters minimum.
                 </div>
               </div>
 
@@ -780,6 +813,7 @@ function CreateProject({ onClose }) {
                 />
                 <div style={styles.characterCount}>
                   {formData.detailed_description.length}/2000 characters
+                  Please input atleast 10 characters minimum.
                 </div>
               </div>
             </div>
