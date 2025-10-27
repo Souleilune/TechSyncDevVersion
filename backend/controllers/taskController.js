@@ -1,5 +1,7 @@
 // backend/controllers/taskController.js
 const supabase = require('../config/supabase');
+const { checkAutoComplete } = require('./collaborativeProjectCompletion'); // Import the helper
+
 
 // Update a task - IMPROVED ERROR HANDLING
 const updateTask = async (req, res) => {
@@ -200,6 +202,45 @@ const updateTask = async (req, res) => {
     }
 
     console.log('✅ Task updated successfully:', task.id);
+
+    if (updateData.status === 'completed') {
+      try {
+        console.log('🤖 Checking if project should auto-complete...');
+        
+        // Get project to verify it's a collab project
+        const { data: project } = await supabase
+          .from('projects')
+          .select('maximum_members, status')
+          .eq('id', projectId)
+          .single();
+
+        // Only auto-complete collaborative projects (not solo projects)
+        if (project && project.maximum_members > 1 && project.status !== 'completed') {
+          const { checkAutoComplete } = require('./collaborativeProjectCompletion');
+          
+          // Create a mock request object for the auto-complete check
+          const mockReq = { params: { projectId } };
+          const mockRes = {
+            json: (data) => {
+              if (data.auto_completed) {
+                console.log('🎉 Project auto-completed!');
+              } else {
+                console.log('📊 Project not yet eligible for auto-completion');
+              }
+            },
+            status: () => mockRes
+          };
+          
+          // Trigger auto-complete check (async, don't wait for it)
+          checkAutoComplete(mockReq, mockRes).catch(err => {
+            console.error('Error in auto-complete check:', err);
+          });
+        }
+      } catch (autoCompleteError) {
+        // Don't fail the task update if auto-complete check fails
+        console.error('Error checking auto-complete:', autoCompleteError);
+      }
+    }
 
     res.json({
       success: true,

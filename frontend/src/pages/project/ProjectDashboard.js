@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { projectService } from '../../services/projectService';
+import ProjectCompletionButton from '../../components/ProjectCompletion/ProjectCompletionButton';
 import { taskService } from '../../services/taskService';
 import { useAuth } from '../../contexts/AuthContext';
 import { PanelLeft } from 'lucide-react';
@@ -414,6 +415,18 @@ function ProjectDashboard() {
   const { projectId } = useParams();
   const { user } = useAuth();
   const [project, setProject] = useState(null);
+  const isOwnerOrLead = project && (
+    project.owner_id === user?.id || 
+    project.members?.some(m => m.user_id === user?.id && m.role === 'lead')
+  );
+  const handleProjectCompleted = () => {
+    // Refresh project data or redirect
+    console.log('Project completed! Refreshing...');
+    // fetchProjectData(); // Your existing fetch function
+    
+    // Or redirect to completed projects page
+    // navigate('/projects?filter=completed');
+  };
   const [analytics, setAnalytics] = useState({
     totalTasks: 0,
     completedTasks: 0,
@@ -969,6 +982,14 @@ function ProjectDashboard() {
   return (
     <>
       {/* Sidebar Toggle Button - OUTSIDE CONTAINER */}
+      {project && project.maximum_members > 1 && project.status !== 'completed' && (
+        <ProjectCompletionButton
+          projectId={project.id}
+          currentUserId={user?.id}
+          isOwnerOrLead={isOwnerOrLead}
+          onProjectCompleted={handleProjectCompleted}
+        />
+      )}
       <button
         style={styles.toggleButton}
         onClick={toggleSidebar}
@@ -1126,6 +1147,7 @@ function ProjectDashboard() {
               )}
             </div>
           </div>
+          
 
           {/* Right Column */}
           <div>
