@@ -1315,21 +1315,7 @@ function Projects() {
             </span>
           </button>
           
-          <button
-            style={{
-              ...styles.tab,
-              ...(activeTab === 'starred' ? styles.activeTab : {})
-            }}
-            onClick={() => setActiveTab('starred')}
-          >
-            ⭐ Starred
-            <span style={{
-              ...styles.tabCount,
-              ...(activeTab === 'starred' ? styles.activeTabCount : {})
-            }}>
-              {starredProjectsCount}
-            </span>
-          </button>
+          
         </div>
 
         {filteredProjects.length > 0 ? (

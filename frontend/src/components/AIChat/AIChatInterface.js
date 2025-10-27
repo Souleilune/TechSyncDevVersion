@@ -514,24 +514,42 @@ What would you like to work on today?`,
       );
 
       if (response.success) {
-        const aiMessage = {
-          id: Date.now() + 1,
-          role: 'assistant',
-          content: response.data.message,
-          timestamp: response.data.timestamp,
-          isProjectSuggestion: (response.data.message.includes('**') && 
-                               (response.data.message.includes('Technologies:') ||
-                                response.data.message.includes('Difficulty:') ||
-                                response.data.message.includes('Key Features:') ||
-                                response.data.message.includes('Time Estimate:') ||
-                                response.data.message.includes('Weekly Task Breakdown:') ||
-                                response.data.message.match(/Week\s+\d+:/i))) ||
-                               response.data.message.toLowerCase().includes('project idea')
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } else {
-        throw new Error(response.message || 'Failed to get AI response');
-      }
+  // FIXED: More strict project suggestion detection
+  const isValidProjectSuggestion = (message) => {
+    // Must have bold title at the start (like **Project Name**)
+    const hasBoldTitle = /^\*\*[^*]+\*\*/.test(message.trim());
+    
+    // Count how many required sections are present
+    const hasKeyFeatures = message.includes('Key Features:');
+    const hasTechnologies = message.includes('Technologies:');
+    const hasDifficulty = message.includes('Difficulty:');
+    const hasTimeEstimate = message.includes('Time Estimate:');
+    const hasWeeklyBreakdown = message.includes('Weekly Task Breakdown:') || message.match(/Week\s+\d+:/i);
+    
+    const requiredSections = [
+      hasKeyFeatures,
+      hasTechnologies,
+      hasDifficulty,
+      hasTimeEstimate,
+      hasWeeklyBreakdown
+    ];
+    
+    const sectionCount = requiredSections.filter(Boolean).length;
+    
+    // Strict criteria: Must have bold title AND at least 3 of the 5 required sections
+    return hasBoldTitle && sectionCount >= 3;
+  };
+
+  const aiMessage = {
+    id: Date.now() + 1,
+    role: 'assistant',
+    content: response.data.message,
+    timestamp: response.data.timestamp,
+    isProjectSuggestion: isValidProjectSuggestion(response.data.message)
+  };
+  
+  setMessages(prev => [...prev, aiMessage]);
+}
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage = {
