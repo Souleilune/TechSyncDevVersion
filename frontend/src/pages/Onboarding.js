@@ -752,7 +752,7 @@ function Onboarding() {
       }}>
         <button
           onClick={() => {
-            if (window.confirm('This will log you out. Are you sure you want to go back to login?')) {
+            if (window.confirm('Are you sure you want to go back to login?')) {
               localStorage.removeItem('token');
               localStorage.removeItem('user');
               window.location.href = '/login';
