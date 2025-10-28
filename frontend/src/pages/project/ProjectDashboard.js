@@ -419,14 +419,6 @@ function ProjectDashboard() {
     project.owner_id === user?.id || 
     project.members?.some(m => m.user_id === user?.id && m.role === 'lead')
   );
-  const handleProjectCompleted = () => {
-    // Refresh project data or redirect
-    console.log('Project completed! Refreshing...');
-    // fetchProjectData(); // Your existing fetch function
-    
-    // Or redirect to completed projects page
-    // navigate('/projects?filter=completed');
-  };
   const [analytics, setAnalytics] = useState({
     totalTasks: 0,
     completedTasks: 0,
@@ -532,6 +524,22 @@ function ProjectDashboard() {
     }
   }, [projectId]);
 
+  // Handle project completion - refresh data when project is marked complete
+  const handleProjectCompleted = useCallback(async () => {
+    console.log('Project completed! Refreshing data...');
+    
+    try {
+      // Refresh project data to update status
+      await fetchDashboardData();
+      
+      // Optionally, you can also add a success notification here
+      // For example, if you have a notification context:
+      // showNotification('success', 'Project has been marked as complete!');
+    } catch (error) {
+      console.error('Error refreshing project data:', error);
+    }
+  }, [fetchDashboardData]);
+
   // Mock member activity (in real app, this would come from activity logs)
   const fetchMemberActivity = useCallback(async () => {
     try {
@@ -636,6 +644,12 @@ function ProjectDashboard() {
   };
 
   const styles = {
+    // NEW: Completion section - inside container, between analytics and announcements
+    completionSection: {
+      position: 'relative',
+      zIndex: 10,
+      marginBottom: '30px'
+    },
     // NEW: Toggle button styles
     toggleButton: {
       position: 'fixed',
@@ -745,7 +759,7 @@ function ProjectDashboard() {
     },
     contentGrid: {
       position: 'relative',
-      zIndex: 10,
+      zIndex: 1,
       display: 'grid',
       gridTemplateColumns: '2fr 1fr',
       gap: '30px',
@@ -753,7 +767,7 @@ function ProjectDashboard() {
     },
     announcementsSection: {
       position: 'relative',
-      zIndex: 10,
+      zIndex: 1,
       marginBottom: '30px'
     },
     card: {
@@ -982,14 +996,6 @@ function ProjectDashboard() {
   return (
     <>
       {/* Sidebar Toggle Button - OUTSIDE CONTAINER */}
-      {project && project.maximum_members > 1 && project.status !== 'completed' && (
-        <ProjectCompletionButton
-          projectId={project.id}
-          currentUserId={user?.id}
-          isOwnerOrLead={isOwnerOrLead}
-          onProjectCompleted={handleProjectCompleted}
-        />
-      )}
       <button
         style={styles.toggleButton}
         onClick={toggleSidebar}
@@ -1070,6 +1076,18 @@ function ProjectDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Project Completion Section - INSIDE CONTAINER */}
+        {project && project.maximum_members > 1 && project.status !== 'completed' && (
+          <div style={styles.completionSection}>
+            <ProjectCompletionButton
+              projectId={project.id}
+              currentUserId={user?.id}
+              isOwnerOrLead={isOwnerOrLead}
+              onProjectCompleted={handleProjectCompleted}
+            />
+          </div>
+        )}
 
         {/* Announcements */}
         <div style={styles.announcementsSection}>

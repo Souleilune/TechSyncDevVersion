@@ -1,5 +1,15 @@
 // frontend/src/components/ProjectCompletion/ProjectCompletionButton.jsx
 import React, { useState, useEffect } from 'react';
+import { 
+  CheckCircle, 
+  XCircle, 
+  Trophy, 
+  Loader2, 
+  Check, 
+  Vote, 
+  BarChart3, 
+  AlertTriangle 
+} from 'lucide-react';
 import collaborativeProjectCompletionService from '../../services/collaborativeProjectCompletionService';
 
 /**
@@ -101,8 +111,8 @@ const ProjectCompletionButton = ({
       
       setSuccessMessage(
         response.data.auto_completed 
-          ? '🎉 Project completed by team vote!' 
-          : `Vote recorded: ${vote === 'approve' ? '✅ Approved' : '❌ Rejected'}`
+          ? 'Project completed by team vote!' 
+          : `Vote recorded: ${vote === 'approve' ? 'Approved' : 'Rejected'}`
       );
       
       // Refresh data
@@ -132,9 +142,13 @@ const ProjectCompletionButton = ({
 
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
-        <span style={styles.loadingText}>Loading completion status...</span>
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <div style={styles.loadingContainer}>
+            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+            <span style={styles.loadingText}>Loading completion status...</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -144,9 +158,13 @@ const ProjectCompletionButton = ({
   // Don't show if already completed
   if (completionStatus.current_status === 'completed') {
     return (
-      <div style={styles.completedBadge}>
-        <span style={styles.completedIcon}>✅</span>
-        <span style={styles.completedText}>Project Completed</span>
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <div style={styles.completedBadge}>
+            <CheckCircle size={20} style={{ color: '#10b981' }} />
+            <span style={styles.completedText}>Project Completed</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -155,22 +173,25 @@ const ProjectCompletionButton = ({
 
   return (
     <div style={styles.container}>
-      {/* Success Message */}
-      {successMessage && (
-        <div style={styles.successMessage}>
-          {successMessage}
-        </div>
-      )}
+      <div style={styles.card}>
+        {/* Success Message */}
+        {successMessage && (
+          <div style={styles.successMessage}>
+            <Trophy size={16} style={{ color: '#10b981' }} />
+            {successMessage}
+          </div>
+        )}
 
-      {/* Error Message */}
-      {error && (
-        <div style={styles.errorMessage}>
-          {error}
-        </div>
-      )}
+        {/* Error Message */}
+        {error && (
+          <div style={styles.errorMessage}>
+            <AlertTriangle size={16} style={{ color: '#ef4444' }} />
+            {error}
+          </div>
+        )}
 
-      {/* Progress Bar */}
-      <div style={styles.progressSection}>
+        {/* Progress Bar */}
+        <div style={styles.progressSection}>
         <div style={styles.progressHeader}>
           <span style={styles.progressLabel}>Project Completion</span>
           <span style={styles.progressPercentage}>{completion_percentage}%</span>
@@ -196,7 +217,7 @@ const ProjectCompletionButton = ({
       {voting.voting_active && (
         <div style={styles.votingStatus}>
           <div style={styles.votingHeader}>
-            <span style={styles.votingIcon}>🗳️</span>
+            <Vote size={20} style={{ color: '#3b82f6' }} />
             <span style={styles.votingTitle}>Team Voting Active</span>
           </div>
           <div style={styles.votingStats}>
@@ -222,7 +243,7 @@ const ProjectCompletionButton = ({
           )}
           {voting.user_voted && (
             <div style={styles.voteStatus}>
-              Your vote: <strong>{voting.user_vote === 'approve' ? '✅ Approved' : '❌ Rejected'}</strong>
+              Your vote: <strong>{voting.user_vote === 'approve' ? 'Approved' : 'Rejected'}</strong>
             </div>
           )}
         </div>
@@ -246,10 +267,10 @@ const ProjectCompletionButton = ({
             }}
           >
             {actionLoading ? (
-              <span style={styles.buttonSpinner}>⏳</span>
+              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
             ) : (
               <>
-                <span style={styles.buttonIcon}>✓</span>
+                <Check size={18} />
                 <span>Mark as Complete</span>
               </>
             )}
@@ -269,7 +290,7 @@ const ProjectCompletionButton = ({
               e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
             }}
           >
-            <span style={styles.buttonIcon}>🗳️</span>
+            <Vote size={18} />
             <span>Vote on Completion</span>
           </button>
         </div>
@@ -291,7 +312,7 @@ const ProjectCompletionButton = ({
             
             <div style={styles.modalContent}>
               <div style={styles.modalInfo}>
-                <span style={styles.infoIcon}>📊</span>
+                <BarChart3 size={32} style={{ color: '#3b82f6' }} />
                 <div>
                   <div style={styles.infoLabel}>Current Progress</div>
                   <div style={styles.infoValue}>{completion_percentage}%</div>
@@ -300,7 +321,7 @@ const ProjectCompletionButton = ({
 
               {!is_eligible_for_completion && (
                 <div style={styles.warningBox}>
-                  <span style={styles.warningIcon}>⚠️</span>
+                  <AlertTriangle size={24} style={{ color: '#fbbf24' }} />
                   <div>
                     <div style={styles.warningTitle}>Below 80% Completion</div>
                     <div style={styles.warningText}>
@@ -311,22 +332,26 @@ const ProjectCompletionButton = ({
                 </div>
               )}
 
-              <div style={styles.infoText}>
+              <p style={styles.infoText}>
                 Marking this project as complete will:
-                <ul style={styles.infoList}>
-                  <li>Award achievements to all team members</li>
-                  <li>Notify all team members</li>
-                  <li>Change project status to "Completed"</li>
-                  <li>Lock the project from further editing</li>
-                </ul>
-              </div>
+              </p>
+              <ul style={styles.infoList}>
+                <li>Change the project status to "completed"</li>
+                <li>Lock task creation and editing</li>
+                <li>Archive the project workspace</li>
+              </ul>
             </div>
-
+            
             <div style={styles.modalActions}>
               <button
                 style={styles.cancelButton}
                 onClick={() => setShowModal(false)}
-                disabled={actionLoading}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }}
               >
                 Cancel
               </button>
@@ -343,7 +368,7 @@ const ProjectCompletionButton = ({
                     e.target.style.backgroundColor = '#10b981';
                   }}
                 >
-                  {actionLoading ? 'Completing...' : 'Mark Complete'}
+                  {actionLoading ? 'Completing...' : 'Confirm Completion'}
                 </button>
               ) : (
                 <button
@@ -382,7 +407,6 @@ const ProjectCompletionButton = ({
             <div style={styles.modalContent}>
               <div style={styles.votingInfo}>
                 <p style={styles.votingDescription}>
-                  Cast your vote on whether this project should be marked as complete. 
                   The project will automatically complete when {voting.votes_needed} or more 
                   members vote to approve ({Math.round((voting.votes_needed / voting.total_members) * 100)}% consensus).
                 </p>
@@ -424,9 +448,16 @@ const ProjectCompletionButton = ({
                       </div>
                       <span style={{
                         ...styles.voteValue,
-                        color: vote.vote === 'approve' ? '#10b981' : '#ef4444'
+                        color: vote.vote === 'approve' ? '#10b981' : '#ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}>
-                        {vote.vote === 'approve' ? '✅ Approved' : '❌ Rejected'}
+                        {vote.vote === 'approve' ? (
+                          <><CheckCircle size={14} /> Approved</>
+                        ) : (
+                          <><XCircle size={14} /> Rejected</>
+                        )}
                       </span>
                     </div>
                   ))}
@@ -439,20 +470,21 @@ const ProjectCompletionButton = ({
                 </div>
               )}
             </div>
-
+            
             <div style={styles.modalActions}>
               <button
                 style={styles.rejectVoteButton}
                 onClick={() => handleVote('reject')}
                 disabled={actionLoading}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#dc2626';
+                  e.target.style.backgroundColor = '#b91c1c';
                 }}
                 onMouseLeave={(e) => {
                   e.target.style.backgroundColor = '#ef4444';
                 }}
               >
-                {actionLoading ? 'Voting...' : '❌ Reject Completion'}
+                <XCircle size={18} />
+                {actionLoading ? 'Voting...' : 'Reject Completion'}
               </button>
               
               <button
@@ -466,12 +498,14 @@ const ProjectCompletionButton = ({
                   e.target.style.backgroundColor = '#10b981';
                 }}
               >
-                {actionLoading ? 'Voting...' : '✅ Approve Completion'}
+                <CheckCircle size={18} />
+                {actionLoading ? 'Voting...' : 'Approve Completion'}
               </button>
             </div>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
@@ -480,8 +514,15 @@ const ProjectCompletionButton = ({
 const styles = {
   container: {
     width: '100%',
-    marginTop: '24px',
     marginBottom: '24px'
+  },
+  card: {
+    background: 'linear-gradient(135deg, rgba(26, 28, 32, 0.95), rgba(15, 17, 22, 0.90))',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '16px',
+    padding: '25px',
+    backdropFilter: 'blur(20px)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
   },
   loadingContainer: {
     display: 'flex',
@@ -492,14 +533,6 @@ const styles = {
     borderRadius: '12px',
     border: '1px solid rgba(59, 130, 246, 0.2)'
   },
-  spinner: {
-    width: '20px',
-    height: '20px',
-    border: '3px solid rgba(59, 130, 246, 0.3)',
-    borderTop: '3px solid #3b82f6',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite'
-  },
   loadingText: {
     color: '#d1d5db',
     fontSize: '14px'
@@ -508,13 +541,10 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '12px 20px',
+    padding: '16px 20px',
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderRadius: '12px',
-    border: '2px solid rgba(16, 185, 129, 0.3)'
-  },
-  completedIcon: {
-    fontSize: '20px'
+    border: '1px solid rgba(16, 185, 129, 0.3)'
   },
   completedText: {
     color: '#10b981',
@@ -540,7 +570,10 @@ const styles = {
     borderRadius: '8px',
     color: '#ef4444',
     fontSize: '14px',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
   },
   progressSection: {
     marginBottom: '20px'
@@ -591,9 +624,6 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     marginBottom: '12px'
-  },
-  votingIcon: {
-    fontSize: '20px'
   },
   votingTitle: {
     color: '#d1d5db',
@@ -670,13 +700,6 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.3s ease'
   },
-  buttonIcon: {
-    fontSize: '18px'
-  },
-  buttonSpinner: {
-    fontSize: '18px',
-    animation: 'spin 1s linear infinite'
-  },
   
   // Modal styles
   modalOverlay: {
@@ -742,9 +765,6 @@ const styles = {
     borderRadius: '12px',
     marginBottom: '16px'
   },
-  infoIcon: {
-    fontSize: '32px'
-  },
   infoLabel: {
     color: '#9ca3af',
     fontSize: '12px',
@@ -763,9 +783,6 @@ const styles = {
     border: '1px solid rgba(251, 191, 36, 0.3)',
     borderRadius: '12px',
     marginBottom: '16px'
-  },
-  warningIcon: {
-    fontSize: '24px'
   },
   warningTitle: {
     color: '#fbbf24',
@@ -917,6 +934,10 @@ const styles = {
   },
   rejectVoteButton: {
     flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
     padding: '12px 24px',
     backgroundColor: '#ef4444',
     color: 'white',
@@ -929,6 +950,10 @@ const styles = {
   },
   approveVoteButton: {
     flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
     padding: '12px 24px',
     backgroundColor: '#10b981',
     color: 'white',
