@@ -728,10 +728,12 @@ function App() {
 
                 {/* Task Detail Route */}
                 <Route 
-                  path="/task/:taskId" 
+                  path="/project/:projectId/tasks/:taskId" 
                   element={
                     <ProtectedRoute>
-                      <TaskDetail />
+                      <ProjectLayout>
+                        <TaskDetail />
+                      </ProjectLayout>
                     </ProtectedRoute>
                   } 
                 />
