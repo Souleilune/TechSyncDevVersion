@@ -317,11 +317,16 @@ function SoloWeeklyChallenge() {
         const allChallenges = challengesRes?.data?.challenges || [];
         console.log('Found challenges for language:', allChallenges.length);
 
-        // 3) Get user attempts to filter out recently attempted ones
+        // 3) Get user attempts - FIXED: Filter by project_id
         const attemptsRes = await ChallengeAPI.getUserAttempts({ page: 1, limit: 50 });
-        const attempts = attemptsRes?.data?.data?.attempts || attemptsRes?.data?.attempts || [];
+        const allAttempts = attemptsRes?.data?.data?.attempts || attemptsRes?.data?.attempts || [];
+        
+        // ✅ CRITICAL FIX: Filter attempts to only include those for THIS project
+        const attempts = allAttempts.filter(a => a.project_id === projectId);
+        
+        console.log('Total attempts:', allAttempts.length, 'Attempts for this project:', attempts.length);
 
-        // Filter out challenges attempted in the last 14 days
+        // Filter out challenges attempted in the last 14 days FOR THIS PROJECT
         const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
         const recentAttemptIds = new Set(
           attempts
@@ -352,8 +357,11 @@ function SoloWeeklyChallenge() {
         if (nextChallenge && isMounted) {
           const formatted = formatChallengeForUI(nextChallenge);
           
-          // Check if user already attempted this challenge
-          const existingAttempt = attempts.find(a => a.challenge_id === nextChallenge.id);
+          // ✅ CRITICAL FIX: Check if user already attempted this challenge IN THIS PROJECT
+          const existingAttempt = attempts.find(a => 
+            a.challenge_id === nextChallenge.id && a.project_id === projectId
+          );
+          
           if (existingAttempt) {
             formatted.submitted = existingAttempt.status !== 'pending';
             formatted.userSubmission = {
@@ -375,11 +383,14 @@ function SoloWeeklyChallenge() {
           setError(`No ${langName || 'programming'} challenges available. New challenges are added weekly!`);
         }
 
-        // 5) Set up past challenges (only from this language)
+        // 5) Set up past challenges - ✅ CRITICAL FIX: Only from this language AND this project
         const pastAttempts = attempts
           .filter(a => {
             const challengeInList = allChallenges.find(ch => ch.id === a.challenge_id);
-            return challengeInList && challengeInList.programming_language_id === langId;
+            // ✅ CRITICAL: Only include attempts for THIS project that match the language
+            return challengeInList && 
+                   challengeInList.programming_language_id === langId &&
+                   a.project_id === projectId;
           })
           .map(a => {
             const challengeDetail = allChallenges.find(ch => ch.id === a.challenge_id);
@@ -418,6 +429,7 @@ function SoloWeeklyChallenge() {
       isMounted = false;
     };
   }, [projectId]);
+
 
   const handleSubmitChallenge = async (e) => {
     e.preventDefault();
