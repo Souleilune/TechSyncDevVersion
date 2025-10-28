@@ -29,6 +29,23 @@ const BackgroundSymbols = () => (
   <>
     {/* Floating Animation CSS */}
     <style>
+       {`
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 12px 32px rgba(16, 185, 129, 0.6);
+      }
+    }
+  `}
       {`
         @keyframes floatAround1 {
           0%, 100% { transform: translate(0, 0) rotate(-15deg); }
@@ -225,6 +242,15 @@ function SoloWeeklyChallenge() {
     window.addEventListener('soloProjectSidebarToggle', handleSidebarToggle);
     return () => window.removeEventListener('soloProjectSidebarToggle', handleSidebarToggle);
   }, []);
+
+  const getStartOfWeek = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+    const monday = new Date(now.setDate(diff));
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  };
   
   // Helpers
   const mapDifficultyToPoints = (level) => {
@@ -327,7 +353,76 @@ function SoloWeeklyChallenge() {
         console.log('Total attempts:', allAttempts.length, 'Attempts for this project:', attempts.length);
 
         // Filter out challenges attempted in the last 14 days FOR THIS PROJECT
-        const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+        // ✅ CRITICAL FIX: Check if user already attempted ANY challenge THIS WEEK
+        const startOfWeek = getStartOfWeek();
+        console.log('Start of current week:', startOfWeek.toISOString());
+
+        const attemptsThisWeek = attempts.filter(a => {
+          const attemptDate = new Date(a.submitted_at || a.started_at || 0);
+          return attemptDate >= startOfWeek;
+        });
+
+        console.log('Attempts this week:', attemptsThisWeek.length);
+
+        // ✅ If user already attempted a challenge this week, show message
+        if (attemptsThisWeek.length > 0 && isMounted) {
+          const lastAttempt = attemptsThisWeek[0];
+          const challengeDetail = allChallenges.find(ch => ch.id === lastAttempt.challenge_id);
+          
+          // Calculate days until next Monday
+          const now = new Date();
+          const nextMonday = new Date(startOfWeek);
+          nextMonday.setDate(nextMonday.getDate() + 7);
+          const daysUntilNextWeek = Math.ceil((nextMonday - now) / (24 * 60 * 60 * 1000));
+
+          setCurrentChallenge({
+            alreadyCompleted: true,
+            completedChallenge: {
+              title: challengeDetail?.title || 'Weekly Challenge',
+              completedAt: lastAttempt.submitted_at || lastAttempt.started_at,
+              score: lastAttempt.score || 0,
+              status: lastAttempt.status,
+              feedback: lastAttempt.feedback
+            },
+            daysUntilNext: daysUntilNextWeek
+          });
+          
+          // Still show past challenges
+          const pastAttempts = attempts
+            .filter(a => {
+              const challengeInList = allChallenges.find(ch => ch.id === a.challenge_id);
+              return challengeInList && 
+                    challengeInList.programming_language_id === langId &&
+                    a.project_id === projectId;
+            })
+            .map(a => {
+              const challengeDetail = allChallenges.find(ch => ch.id === a.challenge_id);
+              return {
+                id: a.challenge_id,
+                title: challengeDetail?.title || 'Challenge',
+                difficulty: challengeDetail?.difficulty_level || 'medium',
+                points: mapDifficultyToPoints(challengeDetail?.difficulty_level),
+                category: 'algorithms',
+                completedAt: a.submitted_at || a.reviewed_at || a.started_at,
+                score: a.score || 0,
+                timeSpent: a.solve_time_minutes
+                  ? `${a.solve_time_minutes} minutes`
+                  : a.execution_time_ms
+                  ? `${Math.round(a.execution_time_ms / 1000)}s`
+                  : '—',
+                status: a.status === 'passed' ? 'completed' : 'missed'
+              };
+            })
+            .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+
+          if (isMounted) setPastChallenges(pastAttempts);
+          if (isMounted) setLoading(false);
+          return; // ← STOP HERE - Don't show new challenge
+        }
+
+        // ✅ If no attempts this week, proceed to show a new challenge
+        // Filter out challenges attempted in the last 7 days (to avoid immediate repeats)
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Changed from 14 to 7
         const recentAttemptIds = new Set(
           attempts
             .filter(a => new Date(a.started_at || a.submitted_at || 0) > since)
@@ -335,12 +430,13 @@ function SoloWeeklyChallenge() {
         );
 
         const availableChallenges = allChallenges.filter(ch => !recentAttemptIds.has(ch.id));
-        
+
         console.log('Available challenges after filtering:', availableChallenges.length);
+        console.log('Recent attempt IDs (last 7 days):', Array.from(recentAttemptIds));
 
         // 4) Pick the next challenge (prefer project-specific, then general)
         let nextChallenge = null;
-        
+
         if (availableChallenges.length > 0) {
           const projectSpecific = availableChallenges.filter(ch => ch.project_id === projectId);
           const general = availableChallenges.filter(ch => !ch.project_id);
@@ -357,21 +453,6 @@ function SoloWeeklyChallenge() {
         if (nextChallenge && isMounted) {
           const formatted = formatChallengeForUI(nextChallenge);
           
-          // ✅ CRITICAL FIX: Check if user already attempted this challenge IN THIS PROJECT
-          const existingAttempt = attempts.find(a => 
-            a.challenge_id === nextChallenge.id && a.project_id === projectId
-          );
-          
-          if (existingAttempt) {
-            formatted.submitted = existingAttempt.status !== 'pending';
-            formatted.userSubmission = {
-              submittedAt: existingAttempt.submitted_at || existingAttempt.started_at,
-              score: existingAttempt.score ?? 0,
-              language: langName?.toLowerCase() || submission.language,
-              feedback: existingAttempt.feedback || ''
-            };
-          }
-          
           // Set submission language default
           if (langName) {
             setSubmission(prev => ({ ...prev, language: langName.toLowerCase() }));
@@ -380,7 +461,7 @@ function SoloWeeklyChallenge() {
           setCurrentChallenge(formatted);
         } else if (isMounted) {
           setCurrentChallenge(null);
-          setError(`No ${langName || 'programming'} challenges available. New challenges are added weekly!`);
+          setError(`No ${langName || 'programming'} challenges available. You've completed all available challenges! Check back next week for new ones.`);
         }
 
         // 5) Set up past challenges - ✅ CRITICAL FIX: Only from this language AND this project
@@ -1024,6 +1105,118 @@ const styles = {
     fontSize: '16px',
     lineHeight: '1.6',
     maxWidth: '500px'
+  },
+  weeklyCompletedCard: {
+    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05))',
+    border: '2px solid rgba(16, 185, 129, 0.3)',
+    borderRadius: '20px',
+    padding: '48px 32px',
+    textAlign: 'center',
+    backdropFilter: 'blur(20px)',
+    boxShadow: '0 8px 32px rgba(16, 185, 129, 0.2)',
+    maxWidth: '600px',
+    margin: '0 auto'
+  },
+  weeklyCompletedIcon: {
+    width: '80px',
+    height: '80px',
+    background: 'linear-gradient(135deg, #10b981, #059669)',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 24px auto',
+    boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
+    animation: 'pulse 2s ease-in-out infinite'
+  },
+  weeklyCompletedTitle: {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#10b981',
+    margin: '0 0 16px 0',
+    letterSpacing: '-0.5px'
+  },
+  weeklyCompletedSubtitle: {
+    fontSize: '18px',
+    color: '#d1d5db',
+    margin: '0 0 32px 0',
+    lineHeight: '1.6'
+  },
+  completedChallengeInfo: {
+    background: 'rgba(0, 0, 0, 0.3)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '12px',
+    padding: '20px',
+    marginBottom: '32px'
+  },
+  completedChallengeName: {
+    fontSize: '16px',
+    color: '#9ca3af',
+    marginBottom: '8px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    fontSize: '12px',
+    fontWeight: '600'
+  },
+  completedChallengeTitle: {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: '16px'
+  },
+  completedChallengeStats: {
+    display: 'flex',
+    gap: '24px',
+    justifyContent: 'center',
+    flexWrap: 'wrap'
+  },
+  completedStatItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    color: '#d1d5db',
+    fontSize: '14px'
+  },
+  countdownSection: {
+    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))',
+    border: '1px solid rgba(59, 130, 246, 0.3)',
+    borderRadius: '12px',
+    padding: '20px',
+    marginBottom: '24px'
+  },
+  countdownTitle: {
+    fontSize: '14px',
+    color: '#9ca3af',
+    marginBottom: '12px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    fontWeight: '600'
+  },
+  countdownValue: {
+    fontSize: '36px',
+    fontWeight: 'bold',
+    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    marginBottom: '8px'
+  },
+  countdownLabel: {
+    fontSize: '14px',
+    color: '#9ca3af'
+  },
+  viewPastButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '12px 24px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '12px',
+    color: '#d1d5db',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease'
   }
 };
 
@@ -1192,267 +1385,337 @@ if (loading) {
 
       {/* Content */}
       {activeTab === 'current' && (
-        <div style={styles.content}>
-          {currentChallenge ? (
-            <div>
-              {/* Challenge Card */}
-              <div style={styles.challengeCard}>
-                <div style={styles.challengeHeader}>
-                  <div style={styles.challengeInfo}>
-                    <h2 style={styles.challengeTitle}>{currentChallenge.title}</h2>
-                    <div style={styles.challengeMeta}>
-                      <span
-                        style={{
-                          ...styles.difficultyBadge,
-                          backgroundColor: getDifficultyColor(currentChallenge.difficulty)
-                        }}
-                      >
-                        {getDifficultyIcon(currentChallenge.difficulty)}
-                        <span style={{ marginLeft: '6px' }}>
-                          {currentChallenge.difficulty?.toUpperCase()}
-                        </span>
-                      </span>
-                      <span style={styles.metaItem}>
-                        <Trophy size={16} style={{ marginRight: '6px', color: '#f59e0b' }} />
-                        {currentChallenge.points} points
-                      </span>
-                      <span style={styles.metaItem}>
-                        <Clock size={16} style={{ marginRight: '6px', color: '#6b7280' }} />
-                        {currentChallenge.timeLimit}
-                      </span>
-                      <span style={styles.metaItem}>
-                        <Monitor size={16} style={{ marginRight: '6px', color: '#6b7280' }} />
-                        {languageName}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div style={styles.challengeSection}>
-                  <h3 style={styles.sectionTitle}>
-                    <FileCode size={20} style={{ marginRight: '8px', color: '#a855f7' }} />
-                    Description
-                  </h3>
-                  <div style={styles.descriptionBox}>
-                    {currentChallenge.description}
-                  </div>
-                </div>
-
-                {/* Examples */}
-                {currentChallenge.examples && currentChallenge.examples.length > 0 && (
-                  <div style={styles.challengeSection}>
-                    <h3 style={styles.sectionTitle}>
-                      <Code2 size={20} style={{ marginRight: '8px', color: '#a855f7' }} />
-                      Examples
-                    </h3>
-                    {currentChallenge.examples.map((example, idx) => (
-                      <div key={idx} style={styles.exampleBox}>
-                        <div style={styles.exampleItem}>
-                          <strong style={styles.exampleLabel}>Input:</strong>
-                          <pre style={styles.codeBlock}>
-                            {example.input}
-                          </pre>
-                        </div>
-                        <div style={styles.exampleItem}>
-                          <strong style={styles.exampleLabel}>Output:</strong>
-                          <pre style={styles.codeBlock}>
-                            {example.output}
-                          </pre>
-                        </div>
-                        {example.explanation && (
-                          <div style={styles.explanationText}>
-                            <strong>Explanation:</strong> {example.explanation}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+  <div style={styles.content}>
+    {!currentChallenge ? (
+      <div style={styles.noChallengeState}>
+        <div style={styles.noChallengeIcon}>
+          <Target size={64} style={{ color: '#a855f7' }} />
+        </div>
+        <h2 style={styles.noChallengeTitle}>No Current Challenge</h2>
+        <p style={styles.noChallengeText}>
+          {languageName 
+            ? `No new ${languageName} challenges available right now. New challenges are added weekly!`
+            : 'No challenges available. Set up your project programming language first.'
+          }
+        </p>
+        <button 
+          onClick={() => window.location.reload()} 
+          style={styles.refreshButton}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+          }}
+        >
+          <RefreshCw size={16} style={{ marginRight: '8px' }} />
+          Check Again
+        </button>
+      </div>
+    ) : currentChallenge.alreadyCompleted ? (
+      <div style={styles.weeklyCompletedCard}>
+        <div style={styles.weeklyCompletedIcon}>
+          <CheckCircle size={40} color="white" />
+        </div>
+        
+        <h2 style={styles.weeklyCompletedTitle}>
+          Weekly Challenge Complete! 🎉
+        </h2>
+        
+        <p style={styles.weeklyCompletedSubtitle}>
+          Great job! You've already completed your challenge for this week.
+          Come back soon for your next challenge!
+        </p>
+        
+        <div style={styles.completedChallengeInfo}>
+          <div style={styles.completedChallengeName}>
+            This Week's Challenge
+          </div>
+          <div style={styles.completedChallengeTitle}>
+            {currentChallenge.completedChallenge.title}
+          </div>
+          <div style={styles.completedChallengeStats}>
+            <div style={styles.completedStatItem}>
+              <Award size={18} color="#10b981" />
+              <span>Score: {currentChallenge.completedChallenge.score}/100</span>
+            </div>
+            <div style={styles.completedStatItem}>
+              <Calendar size={18} color="#6b7280" />
+              <span>
+                {new Date(currentChallenge.completedChallenge.completedAt).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </span>
+            </div>
+            <div style={styles.completedStatItem}>
+              <CheckCircle size={18} color="#10b981" />
+              <span>{currentChallenge.completedChallenge.status === 'passed' ? 'Passed' : 'Completed'}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div style={styles.countdownSection}>
+          <div style={styles.countdownTitle}>Next Challenge Available In</div>
+          <div style={styles.countdownValue}>
+            {currentChallenge.daysUntilNext}
+          </div>
+          <div style={styles.countdownLabel}>
+            {currentChallenge.daysUntilNext === 1 ? 'day' : 'days'}
+          </div>
+        </div>
+        
+        <button
+          style={styles.viewPastButton}
+          onClick={() => setActiveTab('past')}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <Calendar size={16} />
+          View Past Challenges
+        </button>
+      </div>
+    ) : (
+      <div>
+        {/* Challenge Card */}
+        <div style={styles.challengeCard}>
+          <div style={styles.challengeHeader}>
+            <div style={styles.challengeInfo}>
+              <h2 style={styles.challengeTitle}>{currentChallenge.title}</h2>
+              <div style={styles.challengeMeta}>
+                <span
+                  style={{
+                    ...styles.difficultyBadge,
+                    backgroundColor: getDifficultyColor(currentChallenge.difficulty)
+                  }}
+                >
+                  {getDifficultyIcon(currentChallenge.difficulty)}
+                  <span style={{ marginLeft: '6px' }}>
+                    {currentChallenge.difficulty?.toUpperCase()}
+                  </span>
+                </span>
+                <span style={styles.metaItem}>
+                  <Trophy size={16} style={{ marginRight: '6px', color: '#f59e0b' }} />
+                  {currentChallenge.points} points
+                </span>
+                <span style={styles.metaItem}>
+                  <Clock size={16} style={{ marginRight: '6px', color: '#6b7280' }} />
+                  {currentChallenge.timeLimit}
+                </span>
+                <span style={styles.metaItem}>
+                  <Monitor size={16} style={{ marginRight: '6px', color: '#6b7280' }} />
+                  {languageName}
+                </span>
               </div>
+            </div>
+          </div>
 
-              {/* Action Section */}
-              {!currentChallenge.submitted ? (
-                <div style={styles.actionSection}>
-                  {!showSubmission ? (
+          {/* Description */}
+          <div style={styles.challengeSection}>
+            <h3 style={styles.sectionTitle}>
+              <FileCode size={20} style={{ marginRight: '8px', color: '#a855f7' }} />
+              Description
+            </h3>
+            <div style={styles.descriptionBox}>
+              {currentChallenge.description}
+            </div>
+          </div>
+
+          {/* Examples */}
+          {currentChallenge.examples && currentChallenge.examples.length > 0 && (
+            <div style={styles.challengeSection}>
+              <h3 style={styles.sectionTitle}>
+                <Code2 size={20} style={{ marginRight: '8px', color: '#a855f7' }} />
+                Examples
+              </h3>
+              {currentChallenge.examples.map((example, idx) => (
+                <div key={idx} style={styles.exampleBox}>
+                  <div style={styles.exampleItem}>
+                    <strong style={styles.exampleLabel}>Input:</strong>
+                    <pre style={styles.codeBlock}>
+                      {example.input}
+                    </pre>
+                  </div>
+                  <div style={styles.exampleItem}>
+                    <strong style={styles.exampleLabel}>Output:</strong>
+                    <pre style={styles.codeBlock}>
+                      {example.output}
+                    </pre>
+                  </div>
+                  {example.explanation && (
+                    <div style={styles.explanationText}>
+                      <strong>Explanation:</strong> {example.explanation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Action Section */}
+        {!currentChallenge.submitted ? (
+          <div style={styles.actionSection}>
+            {!showSubmission ? (
+              <button
+                onClick={() => setShowSubmission(true)}
+                style={styles.startButton}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                }}
+              >
+                <Play size={20} style={{ marginRight: '8px' }} />
+                Start Challenge
+              </button>
+            ) : (
+              <div style={styles.submissionForm}>
+                <form onSubmit={handleSubmitChallenge}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>
+                      <Code2 size={16} style={{ marginRight: '8px' }} />
+                      Your Solution ({languageName})
+                    </label>
+                    <textarea
+                      value={submission.code}
+                      onChange={(e) => setSubmission(prev => ({ ...prev, code: e.target.value }))}
+                      placeholder={`Write your ${languageName} solution here...`}
+                      rows={15}
+                      style={styles.codeTextarea}
+                      required
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#a855f7';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      value={submission.description}
+                      onChange={(e) => setSubmission(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Describe your approach or any notes about your solution..."
+                      rows={3}
+                      style={styles.descriptionTextarea}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#a855f7';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
+
+                  <div style={styles.buttonGroup}>
                     <button
-                      onClick={() => setShowSubmission(true)}
-                      style={styles.startButton}
+                      type="submit"
+                      disabled={submitting || !submission.code.trim()}
+                      style={{
+                        ...styles.submitButton,
+                        ...(submitting || !submission.code.trim() ? styles.disabledButton : {})
+                      }}
                       onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-2px)';
-                        e.target.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.4)';
+                        if (!submitting && submission.code.trim()) {
+                          e.target.style.transform = 'translateY(-2px)';
+                          e.target.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.4)';
+                        }
                       }}
                       onMouseLeave={(e) => {
                         e.target.style.transform = 'translateY(0)';
                         e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
                       }}
                     >
-                      <Play size={20} style={{ marginRight: '8px' }} />
-                      Start Challenge
+                      {submitting ? (
+                        <>
+                          <RefreshCw size={16} style={{ marginRight: '8px' }} />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={16} style={{ marginRight: '8px' }} />
+                          Submit Solution
+                        </>
+                      )}
                     </button>
-                  ) : (
-                    <div style={styles.submissionForm}>
-                      <form onSubmit={handleSubmitChallenge}>
-                        <div style={styles.formGroup}>
-                          <label style={styles.formLabel}>
-                            <Code2 size={16} style={{ marginRight: '8px' }} />
-                            Your Solution ({languageName})
-                          </label>
-                          <textarea
-                            value={submission.code}
-                            onChange={(e) => setSubmission(prev => ({ ...prev, code: e.target.value }))}
-                            placeholder={`Write your ${languageName} solution here...`}
-                            rows={15}
-                            style={styles.codeTextarea}
-                            required
-                            onFocus={(e) => {
-                              e.target.style.borderColor = '#a855f7';
-                              e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)';
-                            }}
-                            onBlur={(e) => {
-                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                              e.target.style.boxShadow = 'none';
-                            }}
-                          />
-                        </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowSubmission(false)}
+                      style={styles.cancelButton}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = 'rgba(15, 17, 22, 0.95)';
+                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'rgba(26, 28, 32, 0.95)';
+                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                      }}
+                    >
+                      <XCircle size={16} style={{ marginRight: '8px' }} />
+                      Cancel
+                    </button>
+                  </div>
 
-                        <div style={styles.formGroup}>
-                          <label style={styles.formLabel}>
-                            Description (Optional)
-                          </label>
-                          <textarea
-                            value={submission.description}
-                            onChange={(e) => setSubmission(prev => ({ ...prev, description: e.target.value }))}
-                            placeholder="Describe your approach or any notes about your solution..."
-                            rows={3}
-                            style={styles.descriptionTextarea}
-                            onFocus={(e) => {
-                              e.target.style.borderColor = '#a855f7';
-                              e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)';
-                            }}
-                            onBlur={(e) => {
-                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                              e.target.style.boxShadow = 'none';
-                            }}
-                          />
-                        </div>
-
-                        <div style={styles.buttonGroup}>
-                          <button
-                            type="submit"
-                            disabled={submitting || !submission.code.trim()}
-                            style={{
-                              ...styles.submitButton,
-                              ...(submitting || !submission.code.trim() ? styles.disabledButton : {})
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!submitting && submission.code.trim()) {
-                                e.target.style.transform = 'translateY(-2px)';
-                                e.target.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.4)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.transform = 'translateY(0)';
-                              e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-                            }}
-                          >
-                            {submitting ? (
-                              <>
-                                <RefreshCw size={16} style={{ marginRight: '8px' }} />
-                                Submitting...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle size={16} style={{ marginRight: '8px' }} />
-                                Submit Solution
-                              </>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowSubmission(false)}
-                            style={styles.cancelButton}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = 'rgba(15, 17, 22, 0.95)';
-                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'rgba(26, 28, 32, 0.95)';
-                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                            }}
-                          >
-                            <XCircle size={16} style={{ marginRight: '8px' }} />
-                            Cancel
-                          </button>
-                        </div>
-
-                        {error && (
-                          <div style={styles.errorMessage}>
-                            <AlertTriangle size={16} style={{ marginRight: '8px' }} />
-                            {error}
-                          </div>
-                        )}
-                      </form>
+                  {error && (
+                    <div style={styles.errorMessage}>
+                      <AlertTriangle size={16} style={{ marginRight: '8px' }} />
+                      {error}
                     </div>
                   )}
-                </div>
-              ) : (
-                <div style={styles.completedSection}>
-                  <div style={styles.completedHeader}>
-                    <CheckCircle size={24} style={{ color: '#10b981', marginRight: '12px' }} />
-                    <h3 style={styles.completedTitle}>Challenge Completed!</h3>
-                  </div>
-                  <div style={styles.completedStats}>
-                    <div style={styles.statItem}>
-                      <Award size={20} style={{ color: '#f59e0b', marginRight: '8px' }} />
-                      <span><strong>Score:</strong> {currentChallenge.userSubmission?.score}/100</span>
-                    </div>
-                    <div style={styles.statItem}>
-                      <Calendar size={20} style={{ color: '#6b7280', marginRight: '8px' }} />
-                      <span><strong>Submitted:</strong> {new Date(currentChallenge.userSubmission?.submittedAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                  {currentChallenge.userSubmission?.feedback && (
-                    <div style={styles.feedbackBox}>
-                      <div style={styles.feedbackText}>
-                        {currentChallenge.userSubmission.feedback}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={styles.noChallengeState}>
-              <div style={styles.noChallengeIcon}>
-                <Target size={64} style={{ color: '#a855f7' }} />
+                </form>
               </div>
-              <h2 style={styles.noChallengeTitle}>No Current Challenge</h2>
-              <p style={styles.noChallengeText}>
-                {languageName 
-                  ? `No new ${languageName} challenges available right now. New challenges are added weekly!`
-                  : 'No challenges available. Set up your project programming language first.'
-                }
-              </p>
-              <button 
-                onClick={() => window.location.reload()} 
-                style={styles.refreshButton}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-                }}
-              >
-                <RefreshCw size={16} style={{ marginRight: '8px' }} />
-                Check Again
-              </button>
+            )}
+          </div>
+        ) : (
+          <div style={styles.completedSection}>
+            <div style={styles.completedHeader}>
+              <CheckCircle size={24} style={{ color: '#10b981', marginRight: '12px' }} />
+              <h3 style={styles.completedTitle}>Challenge Completed!</h3>
             </div>
-          )}
-        </div>
-      )}
+            <div style={styles.completedStats}>
+              <div style={styles.statItem}>
+                <Award size={20} style={{ color: '#f59e0b', marginRight: '8px' }} />
+                <span><strong>Score:</strong> {currentChallenge.userSubmission?.score}/100</span>
+              </div>
+              <div style={styles.statItem}>
+                <Calendar size={20} style={{ color: '#6b7280', marginRight: '8px' }} />
+                <span><strong>Submitted:</strong> {new Date(currentChallenge.userSubmission?.submittedAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+            {currentChallenge.userSubmission?.feedback && (
+              <div style={styles.feedbackBox}>
+                <div style={styles.feedbackText}>
+                  {currentChallenge.userSubmission.feedback}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+)}
 
       {activeTab === 'past' && (
         <div style={styles.content}>
