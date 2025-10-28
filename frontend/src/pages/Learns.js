@@ -434,12 +434,90 @@ const Learns = () => {
     fetchArticles();
   }, [activeTab, initialLoading]);
 
-  const toggleBookmark = (article) => {
+   useEffect(() => {
+    const fetchBookmarkedArticles = async () => {
+      if (!isAuthenticated || !user?.id) return;
+      
+      try {
+        const response = await fetch(`${API_URL}/recommendations/bookmarked-articles/${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.bookmarkedArticles) {
+            setBookmarkedArticles(data.bookmarkedArticles);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching bookmarked articles:', error);
+      }
+    };
+
+    fetchBookmarkedArticles();
+  }, [isAuthenticated, user, API_URL]);
+
+  const toggleBookmark = async (article) => {
+    if (!isAuthenticated || !user?.id) {
+      alert('Please log in to bookmark articles');
+      return;
+    }
+
     const isBookmarked = bookmarkedArticles.some(b => b.id === article.id);
-    setBookmarkedArticles(isBookmarked 
-      ? bookmarkedArticles.filter(b => b.id !== article.id)
-      : [...bookmarkedArticles, article]
-    );
+    
+    try {
+      if (isBookmarked) {
+        // Remove bookmark
+        const response = await fetch(`${API_URL}/recommendations/bookmark-article`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ articleId: article.id })
+        });
+
+        if (response.ok) {
+          setBookmarkedArticles(bookmarkedArticles.filter(b => b.id !== article.id));
+        } else {
+          throw new Error('Failed to remove bookmark');
+        }
+      } else {
+        // Add bookmark
+        const response = await fetch(`${API_URL}/recommendations/bookmark-article`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            article: {
+              id: article.id,
+              title: article.title,
+              description: article.description,
+              url: article.url,
+              cover_image: article.cover_image,
+              tag_list: article.tag_list,
+              user: article.user,
+              reading_time_minutes: article.reading_time_minutes,
+              positive_reactions_count: article.positive_reactions_count,
+              published_at: article.published_at
+            }
+          })
+        });
+
+        if (response.ok) {
+          setBookmarkedArticles([...bookmarkedArticles, article]);
+        } else {
+          throw new Error('Failed to add bookmark');
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      alert('Failed to update bookmark. Please try again.');
+    }
   };
 
   const styles = {

@@ -6,9 +6,12 @@ import { BookOpen, Youtube, Github, ExternalLink, Trash2, Clock, Star, Graduatio
 const PersonalLearnings = ({ userId }) => {
   const navigate = useNavigate();
   const [learnings, setLearnings] = useState([]);
+  const [bookmarkedArticles, setBookmarkedArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [enrollments, setEnrollments] = useState(new Map());
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'courses', 'articles'
+
 
   useEffect(() => {
     if (userId) {
@@ -71,6 +74,25 @@ const PersonalLearnings = ({ userId }) => {
       setError('Failed to load saved resources');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBookmarkedArticles = async () => {
+    try {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${API_URL}/recommendations/bookmarked-articles/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setBookmarkedArticles(data.bookmarkedArticles || []);
+      }
+    } catch (err) {
+      console.error('Error fetching bookmarked articles:', err);
     }
   };
 

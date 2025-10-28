@@ -915,4 +915,186 @@ router.delete('/personal-learnings/:activityId', authMiddleware, async (req, res
   }
 });
 
+/**
+ * POST /api/recommendations/bookmark-article
+ * Save a Dev.to article as a bookmarked resource
+ */
+router.post('/bookmark-article', authMiddleware, async (req, res) => {
+  try {
+    const { article } = req.body;
+    const userId = req.user.id;
+
+    if (!article || !article.id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Article data is required'
+      });
+    }
+
+    // Check if article is already bookmarked
+    const { data: existing, error: checkError } = await supabase
+      .from('user_activity')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('activity_type', 'bookmarked_article')
+      .eq('activity_data->>articleId', article.id.toString())
+      .single();
+
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        error: 'Article is already bookmarked'
+      });
+    }
+
+    // Save the bookmarked article
+    const { data, error } = await supabase
+      .from('user_activity')
+      .insert({
+        user_id: userId,
+        activity_type: 'bookmarked_article',
+        activity_data: {
+          articleId: article.id,
+          title: article.title,
+          description: article.description,
+          url: article.url,
+          coverImage: article.cover_image,
+          tags: article.tag_list,
+          author: article.user?.name || 'Unknown',
+          readingTime: article.reading_time_minutes,
+          reactions: article.positive_reactions_count,
+          publishedAt: article.published_at,
+          bookmarkedAt: new Date().toISOString(),
+          provider: 'dev.to'
+        },
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error bookmarking article:', error);
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      message: 'Article bookmarked successfully',
+      bookmarkedArticle: data
+    });
+
+  } catch (error) {
+    console.error('Error bookmarking article:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to bookmark article'
+    });
+  }
+});
+
+/**
+ * DELETE /api/recommendations/bookmark-article
+ * Remove a bookmarked article
+ */
+router.delete('/bookmark-article', authMiddleware, async (req, res) => {
+  try {
+    const { articleId } = req.body;
+    const userId = req.user.id;
+
+    if (!articleId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Article ID is required'
+      });
+    }
+
+    const { error } = await supabase
+      .from('user_activity')
+      .delete()
+      .eq('user_id', userId)
+      .eq('activity_type', 'bookmarked_article')
+      .eq('activity_data->>articleId', articleId.toString());
+
+    if (error) {
+      console.error('Error removing bookmark:', error);
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      message: 'Bookmark removed successfully'
+    });
+
+  } catch (error) {
+    console.error('Error removing bookmark:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to remove bookmark'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/bookmarked-articles/:userId
+ * Get all bookmarked articles for a user
+ */
+router.get('/bookmarked-articles/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Verify the requesting user matches the userId
+    if (req.user.id !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized access'
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('user_activity')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('activity_type', 'bookmarked_article')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching bookmarked articles:', error);
+      throw error;
+    }
+
+    // Transform the data to match the article structure
+    const bookmarkedArticles = data.map(item => {
+      const articleData = item.activity_data;
+      return {
+        id: articleData.articleId,
+        title: articleData.title,
+        description: articleData.description,
+        url: articleData.url,
+        cover_image: articleData.coverImage,
+        tag_list: articleData.tags || [],
+        user: {
+          name: articleData.author
+        },
+        reading_time_minutes: articleData.readingTime,
+        positive_reactions_count: articleData.reactions,
+        published_at: articleData.publishedAt,
+        bookmarked_at: articleData.bookmarkedAt
+      };
+    });
+
+    res.json({
+      success: true,
+      bookmarkedArticles,
+      total: bookmarkedArticles.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching bookmarked articles:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch bookmarked articles'
+    });
+  }
+});
+
 module.exports = router;
