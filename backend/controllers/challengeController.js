@@ -627,8 +627,6 @@ const submitSimpleChallenge = async (req, res) => {
       feedback += ' This is a challenging problem - great effort tackling it!';
     }
 
-    // ===== Create Challenge Attempt Record =====
-    // FIXED: Using only the fields that exist in your schema
     const { data: attempt, error: attemptError } = await supabase
       .from('challenge_attempts')
       .insert({
