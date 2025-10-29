@@ -1,25 +1,52 @@
 // backend/services/SkillMatchingService.js
-// OPTIMIZED VERSION - Matches your existing structure but with performance improvements
+// UPDATED VERSION - Fixed threshold confusion and improved balance
 const supabase = require('../config/supabase');
 
 class SkillMatchingService {
   constructor() {
+    // SCORING WEIGHTS
+    // These determine how much each factor contributes to the final match score
     this.weights = {
-      topicCoverage: 0.28,
-      languageProficiency: 0.32,
-      difficultyAlignment: 0.18,
-      interestAffinity: 0.12,
-      popularityBoost: 0.05,
-      recencyBoost: 0.05,
+      topicCoverage: 0.30,          // 30% - Increased from 28%
+      languageProficiency: 0.35,     // 35% - Increased from 32%
+      difficultyAlignment: 0.20,     // 20% - Increased from 18%
+      interestAffinity: 0.10,        // 10% - Decreased from 12%
+      popularityBoost: 0.025,        // 2.5% - Decreased from 5%
+      recencyBoost: 0.025,           // 2.5% - Decreased from 5%
+      
+      // Legacy weights (kept for backward compatibility)
       topic_match: 0.4,
       experience_match: 0.3,
       language_match: 0.3
     };
 
-    this.primaryBoost = 1.5;
-    this.threshold = 40; // Lowered from 55
-    this.minPassingScore = 70;
-    this.maxAttempts = 8;
+    // THRESHOLD SETTINGS
+    // ⚠️ IMPORTANT: These thresholds serve different purposes!
+    
+    // 1. RECOMMENDATION THRESHOLD (recommendationThreshold)
+    //    - Minimum score for a project to appear in recommendations
+    //    - Lower = more permissive (more recommendations, potentially lower quality)
+    //    - Higher = more strict (fewer recommendations, higher quality)
+    //    - RECOMMENDATION: Set to 55-65 for balanced results
+    this.recommendationThreshold = 60;  // ✅ Changed from 40 to 60
+    
+    // 2. CODING CHALLENGE THRESHOLD (minPassingScore)
+    //    - Minimum score to pass the coding challenge and join a project
+    //    - This is SEPARATE from the recommendation score
+    //    - User must score 60%+ on the actual coding test
+    this.minPassingScore = 60;  // ✅ Changed from 70 to 60
+    
+    // 3. DISPLAY THRESHOLD (for frontend filtering)
+    //    - Used in UI to show only "good matches"
+    //    - Should align with recommendationThreshold
+    this.displayThreshold = 60;  // ✅ Added for clarity
+    
+    // Legacy threshold (for backward compatibility)
+    this.threshold = this.recommendationThreshold;
+
+    // OTHER SETTINGS
+    this.primaryBoost = 1.8;     // ✅ Increased from 1.5 (primary skills more important)
+    this.maxAttempts = 8;         // Maximum coding challenge attempts before rejection
     
     // OPTIMIZATION: Add caching
     this.projectCache = null;
@@ -49,11 +76,13 @@ class SkillMatchingService {
             topic: Number(features.topic.score || 0).toFixed(1),
             lang: Number(features.lang.score || 0).toFixed(1),
             diff: Number(features.diff || 0).toFixed(1),
-            total: Number(score || 0).toFixed(1)
+            total: Number(score || 0).toFixed(1),
+            threshold: this.recommendationThreshold
           });
         }
 
-        if (score >= this.threshold) {
+        // ✅ Use recommendationThreshold instead of threshold
+        if (score >= this.recommendationThreshold) {
           const matchFactors = this.buildMatchFactors(user, project, features);
           scored.push({
             projectId: project.id,
@@ -87,7 +116,6 @@ class SkillMatchingService {
   // ============== OPTIMIZED DATA LOADERS ==============
   async getUserProfile(userId) {
     try {
-      // OPTIMIZATION: Single query with joins instead of 3 separate queries
       const { data: user, error: userError } = await supabase
         .from('users')
         .select(`
@@ -129,7 +157,6 @@ class SkillMatchingService {
         return this.filterProjectsForUser(this.projectCache, userId);
       }
 
-      // OPTIMIZATION: Fetch all recruiting projects once and cache them
       const { data: projects, error } = await supabase
         .from('projects')
         .select(`
@@ -183,89 +210,6 @@ class SkillMatchingService {
       languages: project.project_languages?.map(pl => pl.programming_languages?.name).filter(Boolean) || [],
       topics: project.project_topics?.map(pt => pt.topics?.name).filter(Boolean) || []
     }));
-  }
-
-  // ============== LEGACY METHODS (kept for compatibility) ==============
-  async calculateMatchScore(user, project) {
-    try {
-      const topicScore = this.calculateTopicMatch(user.topics, project.project_topics);
-      const experienceScore = this.calculateExperienceMatch(user.years_experience, project.required_experience_level);
-      const languageScore = this.calculateLanguageMatch(user.programming_languages, project.project_languages);
-
-      const weightedScore =
-        topicScore * this.weights.topic_match +
-        experienceScore * this.weights.experience_match +
-        languageScore * this.weights.language_match;
-
-      return Math.round(weightedScore);
-    } catch (error) {
-      console.error('Error calculating match score:', error);
-      return 0;
-    }
-  }
-
-  calculateTopicMatch(userTopics, projectTopics) {
-    if (!userTopics?.length || !projectTopics?.length) return 0;
-    const userTopicNames = userTopics.map(t => t.topics?.name).filter(Boolean);
-    const projectTopicNames = projectTopics.map(t => t.topics?.name).filter(Boolean);
-    const matches = userTopicNames.filter(topic => projectTopicNames.includes(topic));
-    return (matches.length / projectTopicNames.length) * 100;
-  }
-
-  calculateExperienceMatch(userExperience, requiredExperience) {
-    if (!userExperience || !requiredExperience) return 50;
-    const experienceLevels = { beginner: 1, intermediate: 2, advanced: 3, expert: 4 };
-    const userLevelName = this.yearsToLevelName(userExperience);
-    const userLevel = experienceLevels[userLevelName] || 1;
-    const requiredLevel = experienceLevels[String(requiredExperience).toLowerCase()] || 1;
-    return userLevel >= requiredLevel ? 100 : Math.max(0, 100 - ((requiredLevel - userLevel) * 25));
-  }
-
-  calculateLanguageMatch(userLanguages, projectLanguages) {
-    if (!userLanguages?.length || !projectLanguages?.length) return 0;
-    const userLangNames = userLanguages.map(l => l.programming_languages?.name).filter(Boolean);
-    const projectLangNames = projectLanguages.map(l => l.programming_languages?.name).filter(Boolean);
-    const matches = userLangNames.filter(lang => projectLangNames.includes(lang));
-    return (matches.length / projectLangNames.length) * 100;
-  }
-
-  async getMatchFactors(user, project) {
-    const features = this.computeFeatures(user, project);
-    return this.buildMatchFactors(user, project, features);
-  }
-
-  getTopicMatches(userTopics, projectTopics) {
-    const matches = [];
-    for (const projectTopic of projectTopics || []) {
-      const topicName = projectTopic.topics?.name;
-      const userTopic = userTopics.find(ut => ut.topics?.name === topicName);
-      if (userTopic) {
-        matches.push({
-          name: topicName,
-          userInterest: userTopic.interest_level,
-          userExperience: userTopic.experience_level,
-          isPrimary: projectTopic.is_primary
-        });
-      }
-    }
-    return matches;
-  }
-
-  getLanguageMatches(userLanguages, projectLanguages) {
-    const matches = [];
-    for (const projectLang of projectLanguages || []) {
-      const langName = projectLang.programming_languages?.name;
-      const userLang = userLanguages.find(ul => ul.programming_languages?.name === langName);
-      if (userLang) {
-        matches.push({
-          name: langName,
-          userProficiency: userLang.proficiency_level,
-          requiredLevel: projectLang.required_level,
-          isPrimary: projectLang.is_primary
-        });
-      }
-    }
-    return matches;
   }
 
   // ============== SCORING METHODS ==============
@@ -392,8 +336,12 @@ class SkillMatchingService {
   difficultyAlignmentScore(userYears, requiredLevelName) {
     const userLevel = this.levelToNum(this.yearsToLevelName(userYears));
     const reqLevel = this.levelToNum(this.yearsToLevelName(requiredLevelName));
+    
+    // ✅ IMPROVED: Less harsh penalty for being below required level
     if (userLevel >= reqLevel) return 100;
-    return Math.max(0, 100 - (reqLevel - userLevel) * 22);
+    
+    // Reduced penalty from 22 to 18 per level difference
+    return Math.max(0, 100 - (reqLevel - userLevel) * 18);
   }
 
   computeFeatures(user, project) {
@@ -409,6 +357,89 @@ class SkillMatchingService {
       this.weights.languageProficiency * (f.lang?.score || 0) +
       this.weights.difficultyAlignment * (f.diff || 0);
     return Math.max(0, Math.min(100, score));
+  }
+
+  // ============== LEGACY METHODS (kept for compatibility) ==============
+  async calculateMatchScore(user, project) {
+    try {
+      const topicScore = this.calculateTopicMatch(user.topics, project.project_topics);
+      const experienceScore = this.calculateExperienceMatch(user.years_experience, project.required_experience_level);
+      const languageScore = this.calculateLanguageMatch(user.programming_languages, project.project_languages);
+
+      const weightedScore =
+        topicScore * this.weights.topic_match +
+        experienceScore * this.weights.experience_match +
+        languageScore * this.weights.language_match;
+
+      return Math.round(weightedScore);
+    } catch (error) {
+      console.error('Error calculating match score:', error);
+      return 0;
+    }
+  }
+
+  calculateTopicMatch(userTopics, projectTopics) {
+    if (!userTopics?.length || !projectTopics?.length) return 0;
+    const userTopicNames = userTopics.map(t => t.topics?.name).filter(Boolean);
+    const projectTopicNames = projectTopics.map(t => t.topics?.name).filter(Boolean);
+    const matches = userTopicNames.filter(topic => projectTopicNames.includes(topic));
+    return (matches.length / projectTopicNames.length) * 100;
+  }
+
+  calculateExperienceMatch(userExperience, requiredExperience) {
+    if (!userExperience || !requiredExperience) return 50;
+    const experienceLevels = { beginner: 1, intermediate: 2, advanced: 3, expert: 4 };
+    const userLevelName = this.yearsToLevelName(userExperience);
+    const userLevel = experienceLevels[userLevelName] || 1;
+    const requiredLevel = experienceLevels[String(requiredExperience).toLowerCase()] || 1;
+    return userLevel >= requiredLevel ? 100 : Math.max(0, 100 - ((requiredLevel - userLevel) * 25));
+  }
+
+  calculateLanguageMatch(userLanguages, projectLanguages) {
+    if (!userLanguages?.length || !projectLanguages?.length) return 0;
+    const userLangNames = userLanguages.map(l => l.programming_languages?.name).filter(Boolean);
+    const projectLangNames = projectLanguages.map(l => l.programming_languages?.name).filter(Boolean);
+    const matches = userLangNames.filter(lang => projectLangNames.includes(lang));
+    return (matches.length / projectLangNames.length) * 100;
+  }
+
+  async getMatchFactors(user, project) {
+    const features = this.computeFeatures(user, project);
+    return this.buildMatchFactors(user, project, features);
+  }
+
+  getTopicMatches(userTopics, projectTopics) {
+    const matches = [];
+    for (const projectTopic of projectTopics || []) {
+      const topicName = projectTopic.topics?.name;
+      const userTopic = userTopics.find(ut => ut.topics?.name === topicName);
+      if (userTopic) {
+        matches.push({
+          name: topicName,
+          userInterest: userTopic.interest_level,
+          userExperience: userTopic.experience_level,
+          isPrimary: projectTopic.is_primary
+        });
+      }
+    }
+    return matches;
+  }
+
+  getLanguageMatches(userLanguages, projectLanguages) {
+    const matches = [];
+    for (const projectLang of projectLanguages || []) {
+      const langName = projectLang.programming_languages?.name;
+      const userLang = userLanguages.find(ul => ul.programming_languages?.name === langName);
+      if (userLang) {
+        matches.push({
+          name: langName,
+          userProficiency: userLang.proficiency_level,
+          requiredLevel: projectLang.required_level,
+          isPrimary: projectLang.is_primary
+        });
+      }
+    }
+    return matches;
   }
 
   toNum(v) {
@@ -428,13 +459,11 @@ class SkillMatchingService {
       .sort((a, b) => (Number(b.is_primary) - Number(a.is_primary)) || (b.userProficiency - a.userProficiency))
       .slice(0, 3);
 
-    // FIXED: Use the correct property names from the scoring functions
     const criticalGaps = [...(f.lang.gaps || []), ...(f.topic.missing || [])]
       .sort((a, b) => (Number(b.is_primary) - Number(a.is_primary)))
       .slice(0, 3);
 
     return {
-      // legacy factors
       topicMatches: this.getTopicMatches(user.topics, project.project_topics || []),
       languageMatches: this.getLanguageMatches(user.programming_languages, project.project_languages || []),
       experienceMatch: {
@@ -442,7 +471,6 @@ class SkillMatchingService {
         requiredExperience: project.required_experience_level,
         isMatch: this.calculateExperienceMatch(user.years_experience, project.required_experience_level) >= 75
       },
-      // enhanced factors
       topicCoverage: {
         score: Math.round(f.topic.score || 0),
         matches: topTopicMatches,
@@ -523,7 +551,6 @@ class SkillMatchingService {
   }
 
   async storeRecommendations(userId, recommendations) {
-    // Fire and forget - don't block
     try {
       const records = recommendations.map(rec => ({
         user_id: userId,
@@ -537,15 +564,24 @@ class SkillMatchingService {
         onConflict: 'user_id,project_id'
       });
     } catch (error) {
-      // Silently fail
       console.error('Failed to store recommendations:', error);
     }
   }
 
-  // Clear cache manually if needed
   clearCache() {
     this.projectCache = null;
     this.projectCacheTime = 0;
+  }
+
+  // ✅ NEW: Get current thresholds (for debugging/testing)
+  getThresholds() {
+    return {
+      recommendationThreshold: this.recommendationThreshold,
+      minPassingScore: this.minPassingScore,
+      displayThreshold: this.displayThreshold,
+      primaryBoost: this.primaryBoost,
+      weights: this.weights
+    };
   }
 }
 
