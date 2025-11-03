@@ -12,7 +12,8 @@
     "test:algorithms": "node scripts/runAllAlgorithmTests.js",
     "test:assessment": "node scripts/testSkillAssessmentAlgorithm.js",
     "check:db": "node scripts/checkDatabaseStats.js",
-    "paper:separate-tables": "node scripts/testRecommendationScalability_SeparateTables.js"
+    "paper:separate-tables": "node scripts/testRecommendationScalability_SeparateTables.js",
+    "rejection:confusion": "node scripts/testRejectionLearningConfusionMatrix.js"
 
 
   },

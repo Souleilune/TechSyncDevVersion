@@ -1,65 +1,141 @@
 // backend/services/SkillMatchingService.js
-// UPDATED VERSION - Fixed threshold confusion and improved balance
+// ENHANCED VERSION - Including code evaluation methods
 const supabase = require('../config/supabase');
 
 class SkillMatchingService {
   constructor() {
-    // SCORING WEIGHTS
-    // These determine how much each factor contributes to the final match score
     this.weights = {
-      topicCoverage: 0.30,          // 30% - Increased from 28%
-      languageProficiency: 0.35,     // 35% - Increased from 32%
-      difficultyAlignment: 0.20,     // 20% - Increased from 18%
-      interestAffinity: 0.10,        // 10% - Decreased from 12%
-      popularityBoost: 0.025,        // 2.5% - Decreased from 5%
-      recencyBoost: 0.025,           // 2.5% - Decreased from 5%
-      
-      // Legacy weights (kept for backward compatibility)
+      topicCoverage: 0.30,
+      languageProficiency: 0.35,
+      difficultyAlignment: 0.20,
+      interestAffinity: 0.10,
+      popularityBoost: 0.025,
+      recencyBoost: 0.025,
       topic_match: 0.4,
       experience_match: 0.3,
       language_match: 0.3
     };
 
-    // THRESHOLD SETTINGS
-    // ⚠️ IMPORTANT: These thresholds serve different purposes!
+    this.primaryBoost = 1.5;
+    this.recommendationThreshold = 60;
+    this.minPassingScore = 60;
+    this.displayThreshold = 50;
+    this.maxAttempts = 8;
     
-    // 1. RECOMMENDATION THRESHOLD (recommendationThreshold)
-    //    - Minimum score for a project to appear in recommendations
-    //    - Lower = more permissive (more recommendations, potentially lower quality)
-    //    - Higher = more strict (fewer recommendations, higher quality)
-    //    - RECOMMENDATION: Set to 55-65 for balanced results
-    this.recommendationThreshold = 60;  // ✅ Changed from 40 to 60
-    
-    // 2. CODING CHALLENGE THRESHOLD (minPassingScore)
-    //    - Minimum score to pass the coding challenge and join a project
-    //    - This is SEPARATE from the recommendation score
-    //    - User must score 60%+ on the actual coding test
-    this.minPassingScore = 60;  // ✅ Changed from 70 to 60
-    
-    // 3. DISPLAY THRESHOLD (for frontend filtering)
-    //    - Used in UI to show only "good matches"
-    //    - Should align with recommendationThreshold
-    this.displayThreshold = 60;  // ✅ Added for clarity
-    
-    // Legacy threshold (for backward compatibility)
-    this.threshold = this.recommendationThreshold;
-
-    // OTHER SETTINGS
-    this.primaryBoost = 1.8;     // ✅ Increased from 1.5 (primary skills more important)
-    this.maxAttempts = 8;         // Maximum coding challenge attempts before rejection
-    
-    // OPTIMIZATION: Add caching
     this.projectCache = null;
     this.projectCacheTime = 0;
-    this.cacheDuration = 60000; // 1 minute cache
+    this.cacheDuration = 60000;
   }
 
-  // ============== PUBLIC API ==============
+  // ============== CODE EVALUATION METHODS ==============
+  
+  /**
+   * Evaluate code quality and return a score (0-100)
+   * Heuristic-based evaluation used when Judge0 is not available
+   */
+  evaluateCode(code) {
+    const src = String(code || '').trim();
+    
+    if (!src || src.length < 10) {
+      return 0;
+    }
+
+    let score = 0;
+    const details = this.analyzeCodeQuality(src);
+
+    // Base score for code length (20 points max)
+    if (src.length > 20) score += 20;
+    if (src.length > 100) score += 5;
+    if (src.length > 200) score += 5;
+
+    // Function definition (30 points)
+    if (details.hasFunction) score += 30;
+
+    // Logic/control flow (25 points)
+    if (details.hasLogic) score += 25;
+
+    // Return statement (15 points)
+    if (details.hasReturn) score += 15;
+
+    // Comments (5 points)
+    if (details.hasComments) score += 5;
+
+    // Variables (5 points)
+    if (details.hasVariables) score += 5;
+
+    // Bonus for advanced patterns (10 points max)
+    if (details.hasErrorHandling) score += 3;
+    if (details.hasAsync) score += 3;
+    if (details.hasClassOrOOP) score += 4;
+
+    return Math.min(100, Math.max(0, score));
+  }
+
+  /**
+   * Analyze code quality metrics
+   */
+  analyzeCodeQuality(code) {
+    const src = String(code || '');
+    
+    return {
+      hasFunction: /function\s+\w+|const\s+\w+\s*=|def\s+\w+|class\s+\w+|func\s+\w+|fn\s+\w+|public\s+\w+|private\s+\w+|sub\s+\w+|proc\s+\w+/i.test(src),
+      hasLogic: /if\s*\(|for\s*\(|while\s*\(|switch\s*\(|forEach|map|filter|reduce|match|case|when|loop|do\s+|until|unless/i.test(src),
+      hasReturn: /return\s+|yield\s+|res\.json|echo\s+|print\s+|println|puts\s+|console\.log/i.test(src),
+      hasComments: /\/\/|\/\*|\*\/|#|"""|'''|<!--/g.test(src),
+      hasVariables: /const\s+\w+|let\s+\w+|var\s+\w+|:\w+\s+=|my\s+\w+|\$\w+\s*=|dim\s+\w+/i.test(src),
+      hasErrorHandling: /try\s*{|catch\s*\(|except\s*:|rescue\s+|error\s*=>|throw\s+|raise\s+/i.test(src),
+      hasAsync: /async\s+|await\s+|promise|\.then\(|callback|future|task\s*</i.test(src),
+      hasClassOrOOP: /class\s+\w+|extends\s+\w+|implements\s+\w+|interface\s+\w+|new\s+\w+\(|this\.|self\./i.test(src),
+      codeLength: src.length,
+      lineCount: src.split('\n').length,
+      hasProperIndentation: src.includes('  ') || src.includes('\t')
+    };
+  }
+
+  /**
+   * Generate feedback based on score
+   */
+  generateFeedback(score) {
+    if (score >= 90) {
+      return '🎉 Excellent work! Your code demonstrates exceptional programming skills with clear structure, logic, and best practices.';
+    } else if (score >= 80) {
+      return '🌟 Great job! Your code shows strong understanding with good structure and solid implementation.';
+    } else if (score >= 70) {
+      return '👍 Good effort! Your code demonstrates solid programming fundamentals. Consider adding more robust error handling or comments.';
+    } else if (score >= 60) {
+      return '💪 Nice try! Your solution shows promise. Try adding more structure, control flow, and proper variable management.';
+    } else if (score >= 40) {
+      return '📚 Keep practicing! Focus on creating complete functions with clear logic and return values. Add comments to explain your approach.';
+    } else {
+      return '🌱 Good start! Remember to include functions, variables, control flow (if/for/while), and return statements. Every expert was once a beginner!';
+    }
+  }
+
+  /**
+   * Get challenge by ID from database
+   */
+  async getChallengeById(challengeId) {
+    try {
+      const { data, error } = await supabase
+        .from('coding_challenges')
+        .select('*')
+        .eq('id', challengeId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching challenge:', error);
+      return null;
+    }
+  }
+
+  // ============== PROJECT RECOMMENDATION METHODS ==============
+  
   async recommendProjects(userId, options = {}) {
     try {
       const limit = options.limit || 10;
       
-      // OPTIMIZATION: Parallel data fetching
       const [user, availableProjects] = await Promise.all([
         this.getUserProfile(userId),
         this.getAvailableProjects(userId)
@@ -70,149 +146,208 @@ class SkillMatchingService {
         const features = this.computeFeatures(user, project);
         const score = this.aggregateScore(features);
 
-        if (process.env.DEBUG_RECS === '1') {
-          console.log({
-            project: project.title,
-            topic: Number(features.topic.score || 0).toFixed(1),
-            lang: Number(features.lang.score || 0).toFixed(1),
-            diff: Number(features.diff || 0).toFixed(1),
-            total: Number(score || 0).toFixed(1),
-            threshold: this.recommendationThreshold
-          });
-        }
-
-        // ✅ Use recommendationThreshold instead of threshold
         if (score >= this.recommendationThreshold) {
           const matchFactors = this.buildMatchFactors(user, project, features);
           scored.push({
             projectId: project.id,
             score: Math.round(score),
-            title: project.title,
-            description: project.description,
-            difficulty_level: project.difficulty_level,
-            current_members: project.current_members,
-            maximum_members: project.maximum_members,
-            technologies: project.languages || [],
             matchFactors,
-            recommendationId: `rec_${userId}_${project.id}_${Date.now()}`
+            project
           });
         }
       }
 
-      const reranked = this.diversityReRank(scored, 0.25);
+      scored.sort((a, b) => b.score - a.score);
+      const topN = scored.slice(0, limit);
+      const diverse = this.diversityReRank(topN, 0.25);
 
-      // OPTIMIZATION: Don't wait for storage (fire and forget)
-      this.storeRecommendations(userId, reranked).catch(err => 
-        console.error('Failed to store recommendations:', err)
-      );
-      
-      return reranked.slice(0, limit);
+      return diverse;
     } catch (error) {
       console.error('Error in recommendProjects:', error);
-      throw error;
+      return [];
     }
   }
 
-  // ============== OPTIMIZED DATA LOADERS ==============
   async getUserProfile(userId) {
-    try {
-      const { data: user, error: userError } = await supabase
-        .from('users')
-        .select(`
-          id, username, email, full_name, years_experience,
-          user_programming_languages:user_programming_languages (
-            id,
-            proficiency_level,
-            years_experience,
-            programming_languages (id, name, description)
-          ),
-          user_topics:user_topics (
-            id,
-            interest_level,
-            experience_level,
-            topics (id, name, description, category)
-          )
-        `)
-        .eq('id', userId)
-        .single();
+    const { data, error } = await supabase
+      .from('users')
+      .select(`
+        id, years_experience,
+        user_topics (interest_level, experience_level, topics (name)),
+        user_programming_languages (proficiency_level, years_experience, programming_languages (name))
+      `)
+      .eq('id', userId)
+      .single();
 
-      if (userError || !user) throw new Error('User not found');
-
-      return {
-        ...user,
-        programming_languages: user.user_programming_languages || [],
-        topics: user.user_topics || []
-      };
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      throw error;
-    }
+    if (error) throw new Error('User not found');
+    return {
+      id: data.id,
+      years_experience: data.years_experience || 0,
+      topics: data.user_topics || [],
+      programming_languages: data.user_programming_languages || []
+    };
   }
 
   async getAvailableProjects(userId) {
-    try {
-      // OPTIMIZATION: Use cache if available and fresh
-      const now = Date.now();
-      if (this.projectCache && (now - this.projectCacheTime) < this.cacheDuration) {
-        return this.filterProjectsForUser(this.projectCache, userId);
-      }
-
-      const { data: projects, error } = await supabase
-        .from('projects')
-        .select(`
-          id, title, description, difficulty_level, required_experience_level,
-          current_members, maximum_members, status, owner_id,
-          project_languages (
-            programming_languages (id, name),
-            required_level,
-            is_primary
-          ),
-          project_topics (
-            topics (id, name, category),
-            is_primary
-          )
-        `)
-        .eq('status', 'recruiting');
-
-      if (error) throw error;
-
-      // Store in cache
-      this.projectCache = projects || [];
-      this.projectCacheTime = now;
-
-      return this.filterProjectsForUser(this.projectCache, userId);
-    } catch (error) {
-      console.error('Error getting available projects:', error);
-      throw error;
+    const now = Date.now();
+    if (this.projectCache && (now - this.projectCacheTime) < this.cacheDuration) {
+      return this.filterUserProjects(this.projectCache, userId);
     }
+
+    const { data, error } = await supabase
+      .from('projects')
+      .select(`
+        *,
+        project_topics (is_primary, topics (name)),
+        project_languages (is_primary, required_level, programming_languages (name)),
+        project_members!inner (user_id, role)
+      `)
+      .eq('status', 'recruiting');
+
+    if (error) throw new Error('Failed to fetch projects');
+
+    this.projectCache = data || [];
+    this.projectCacheTime = now;
+
+    return this.filterUserProjects(this.projectCache, userId);
   }
 
-  async filterProjectsForUser(projects, userId) {
-    const { data: userMemberships, error: membershipError } = await supabase
-      .from('project_members')
-      .select('project_id')
-      .eq('user_id', userId)
-      .eq('status', 'active');
-
-    if (membershipError) {
-      console.error('Error fetching user memberships:', membershipError);
-    }
-
-    const userProjectIds = new Set(userMemberships?.map(m => m.project_id) || []);
-    const availableProjects = projects.filter(project =>
-      project.current_members < project.maximum_members &&
-      project.owner_id !== userId &&
-      !userProjectIds.has(project.id)
+  filterUserProjects(projects, userId) {
+    return projects.filter(p => 
+      !p.project_members?.some(m => m.user_id === userId)
     );
+  }
 
-    return availableProjects.map(project => ({
-      ...project,
-      languages: project.project_languages?.map(pl => pl.programming_languages?.name).filter(Boolean) || [],
-      topics: project.project_topics?.map(pt => pt.topics?.name).filter(Boolean) || []
-    }));
+  computeFeatures(user, project) {
+    const topic = this.topicCoverageScore(user.topics, project.project_topics || []);
+    const lang = this.languageProficiencyScore(user.programming_languages, project.project_languages || []);
+    const diff = this.difficultyAlignmentScore(user.years_experience, project.required_experience_level);
+    return { topic, lang, diff };
+  }
+
+  aggregateScore(f) {
+    let score =
+      this.weights.topicCoverage * (f.topic?.score || 0) +
+      this.weights.languageProficiency * (f.lang?.score || 0) +
+      this.weights.difficultyAlignment * (f.diff || 0);
+    return Math.max(0, Math.min(100, score));
+  }
+
+  buildMatchFactors(user, project, features) {
+    const langMatches = this.getLanguageMatches(user.programming_languages, project.project_languages || []);
+    const topicMatches = this.getTopicMatches(user.topics, project.project_topics || []);
+
+    return {
+      topicCoverage: features.topic?.score || 0,
+      topicMatches,
+      languageProficiency: features.lang?.score || 0,
+      languageMatches: langMatches,
+      difficultyAlignment: features.diff || 0,
+      strengthsHighlight: this.strengthsHighlight(langMatches, topicMatches),
+      improvementSuggestions: this.suggestImprovements(features.lang?.gaps || [])
+    };
   }
 
   // ============== SCORING METHODS ==============
+  
+  topicCoverageScore(userTopics, projectTopics) {
+    if (!projectTopics?.length) return { score: 50, matches: [], gaps: [], coverage: 0 };
+
+    let sum = 0;
+    let totalWeight = 0;
+    let covered = 0;
+    const matches = [];
+    const gaps = [];
+
+    for (const pt of projectTopics) {
+      const name = pt.topics?.name;
+      if (!name) continue;
+
+      const weight = pt.is_primary ? this.primaryBoost : 1.0;
+      totalWeight += weight;
+
+      const ut = userTopics.find(ut => ut.topics?.name === name);
+      if (ut) {
+        const exp = this.normalizeLevel01(ut.experience_level);
+        const interest = this.normalizeLevel01(ut.interest_level);
+        const avg = (exp + interest) / 2;
+        const contrib = avg * 100 * weight;
+        sum += contrib;
+        covered += weight;
+        matches.push({
+          name,
+          userExperience: exp,
+          userInterest: interest,
+          is_primary: !!pt.is_primary,
+          contribution: contrib
+        });
+      } else {
+        gaps.push({ name, is_primary: !!pt.is_primary, status: 'missing' });
+      }
+    }
+
+    const coverage = totalWeight ? (covered / totalWeight) : 0;
+    const baseScore = totalWeight ? (sum / totalWeight) : 0;
+    const score = (0.85 * baseScore) + (0.15 * coverage * 100);
+
+    return { score, matches, gaps, coverage };
+  }
+
+  languageProficiencyScore(userLanguages, projectLanguages) {
+    if (!projectLanguages?.length) return { score: 50, matches: [], gaps: [], coverage: 0 };
+
+    let sum = 0;
+    let totalWeight = 0;
+    let covered = 0;
+    const matches = [];
+    const gaps = [];
+
+    for (const pl of projectLanguages) {
+      const name = pl.programming_languages?.name;
+      if (!name) continue;
+
+      const weight = pl.is_primary ? this.primaryBoost : 1.0;
+      totalWeight += weight;
+      const req = this.normalizeRequiredLevel(pl.required_level);
+
+      const ul = userLanguages.find(ul => ul.programming_languages?.name === name);
+      if (ul) {
+        const prof = this.normalizeLevel01(ul.proficiency_level);
+        const contrib = (prof >= req ? 100 : (prof / req) * 70) * weight;
+        sum += contrib;
+        covered += weight;
+        matches.push({
+          name,
+          userProficiency: prof,
+          required: req,
+          is_primary: !!pl.is_primary,
+          contribution: contrib
+        });
+
+        if (prof < req) {
+          gaps.push({ name, userProficiency: prof, required: req, is_primary: !!pl.is_primary, status: 'below' });
+        }
+      } else {
+        gaps.push({ name, userProficiency: 0, required: req, is_primary: !!pl.is_primary, status: 'missing' });
+      }
+    }
+
+    const coverage = totalWeight ? (covered / totalWeight) : 0;
+    const baseScore = totalWeight ? (sum / totalWeight) : 0;
+    const score = (0.85 * baseScore) + (0.15 * coverage * 100);
+    return { score, matches, gaps, coverage };
+  }
+
+  difficultyAlignmentScore(userYears, requiredLevelName) {
+    const userLevel = this.levelToNum(this.yearsToLevelName(userYears));
+    const reqLevel = this.levelToNum(this.yearsToLevelName(requiredLevelName));
+    
+    if (userLevel >= reqLevel) return 100;
+    return Math.max(0, 100 - (reqLevel - userLevel) * 18);
+  }
+
+  // ============== HELPER METHODS ==============
+  
   levelToNum(levelName) {
     const map = { beginner: 1, intermediate: 2, advanced: 3, expert: 4 };
     return map[String(levelName).toLowerCase()] || 2;
@@ -246,120 +381,100 @@ class SkillMatchingService {
     return map[String(level || 'intermediate').toLowerCase()] ?? 0.5;
   }
 
-  normalizeProficiency(level, years) {
-    let base = 0.4;
-    if (level != null) {
-      if (typeof level === 'number') {
-        base = this.clamp01(level);
-      } else {
-        const map = { beginner: 0.25, intermediate: 0.5, advanced: 0.75, expert: 1.0 };
-        base = map[String(level).toLowerCase()] ?? 0.4;
+  getTopicMatches(userTopics, projectTopics) {
+    const matches = [];
+    for (const projectTopic of projectTopics || []) {
+      const topicName = projectTopic.topics?.name;
+      const userTopic = userTopics.find(ut => ut.topics?.name === topicName);
+      if (userTopic) {
+        matches.push({
+          name: topicName,
+          userInterest: userTopic.interest_level,
+          userExperience: userTopic.experience_level,
+          isPrimary: projectTopic.is_primary
+        });
       }
     }
-    const y = Number(years) || 0;
-    const yearsAdj = this.clamp01(y >= 6 ? 1 : y / 6);
-    return 0.7 * base + 0.3 * yearsAdj;
+    return matches;
   }
 
-  topicCoverageScore(userTopics, projectTopics) {
-    if (!userTopics?.length || !projectTopics?.length) return { score: 0, matches: [], missing: [] };
-
-    let totalWeight = 0;
-    let sum = 0;
+  getLanguageMatches(userLanguages, projectLanguages) {
     const matches = [];
-    const missing = [];
-
-    for (const pt of projectTopics) {
-      const name = pt.topics?.name;
-      if (!name) continue;
-
-      const weight = pt.is_primary ? this.primaryBoost : 1;
-      totalWeight += weight;
-
-      const ut = userTopics.find(t => t.topics?.name === name);
-      if (ut) {
-        const exp = this.normalizeLevel01(ut.experience_level);
-        const interest = this.normalizeLevel01(ut.interest_level);
-        const v = (0.6 * exp + 0.4 * interest) * weight;
-        sum += v;
-        matches.push({ name, is_primary: !!pt.is_primary, interest: ut.interest_level, experience: ut.experience_level });
-      } else {
-        missing.push({ name, is_primary: !!pt.is_primary });
+    for (const projectLang of projectLanguages || []) {
+      const langName = projectLang.programming_languages?.name;
+      const userLang = userLanguages.find(ul => ul.programming_languages?.name === langName);
+      if (userLang) {
+        matches.push({
+          name: langName,
+          userProficiency: userLang.proficiency_level,
+          requiredLevel: projectLang.required_level,
+          isPrimary: projectLang.is_primary
+        });
       }
     }
-
-    const score = totalWeight ? (sum / totalWeight) * 100 : 0;
-    return { score, matches, missing };
+    return matches;
   }
 
-  languageProficiencyScore(userLangs, projectLangs) {
-    if (!userLangs?.length || !projectLangs?.length) return { score: 0, matches: [], gaps: [], coverage: 0 };
+  strengthsHighlight(langMatches, topicMatches) {
+    const bits = [];
+    if (langMatches.length) {
+      const primary = langMatches.find(l => l.isPrimary) || langMatches[0];
+      if (primary) bits.push(`Strong fit in ${primary.name}`);
+    }
+    if (topicMatches.length) {
+      const primary = topicMatches.find(t => t.isPrimary) || topicMatches[0];
+      if (primary) bits.push(`Good coverage on ${primary.name}`);
+    }
+    return bits;
+  }
 
-    let totalWeight = 0;
-    let sum = 0;
-    let covered = 0;
-    const matches = [];
-    const gaps = [];
-
-    for (const pl of projectLangs) {
-      const name = pl.programming_languages?.name;
-      if (!name) continue;
-
-      const weight = pl.is_primary ? this.primaryBoost : 1;
-      totalWeight += weight;
-
-      const req = this.normalizeRequiredLevel(pl.required_level);
-      const ul = userLangs.find(ul => ul.programming_languages?.name === name);
-
-      if (ul) {
-        covered += weight;
-        const prof = this.normalizeProficiency(ul.proficiency_level, ul.years_experience);
-        const gap = Math.max(0, req - prof);
-        const s = Math.max(0, 1 - gap);
-        sum += s * weight;
-        if (gap <= 0) {
-          matches.push({ name, userProficiency: prof, required: req, is_primary: !!pl.is_primary, status: 'meets' });
-        } else {
-          gaps.push({ name, userProficiency: prof, required: req, is_primary: !!pl.is_primary, status: 'below' });
+  suggestImprovements(gaps) {
+    if (!gaps?.length) return [];
+    return gaps.map(g => {
+      if (g.required != null) {
+        const need = Math.ceil((g.required * 5) - (g.userProficiency * 5));
+        if (g.status === 'missing') {
+          return `Add basics of ${g.name} (target ~${Math.max(2, Math.ceil(g.required * 5))}/5)`;
         }
-      } else {
-        gaps.push({ name, userProficiency: 0, required: req, is_primary: !!pl.is_primary, status: 'missing' });
+        return `Level up ${g.name} by ~${Math.max(1, need)} step(s) to meet project needs`;
       }
+      return `Explore topic ${g.name}`;
+    }).slice(0, 3);
+  }
+
+  diversityReRank(items, lambda = 0.25) {
+    if (items.length <= 1) return items;
+    
+    const selected = [];
+    const remaining = [...items];
+    const sim = (a, b) => {
+      const setA = new Set([...(a.project?.project_languages?.map(pl => pl.programming_languages?.name) || [])]);
+      const setB = new Set([...(b.project?.project_languages?.map(pl => pl.programming_languages?.name) || [])]);
+      const inter = [...setA].filter(x => setB.has(x)).length;
+      const uni = new Set([...setA, ...setB]).size || 1;
+      return inter / uni;
+    };
+
+    while (remaining.length) {
+      let bestIdx = 0;
+      let bestScore = -Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const cand = remaining[i];
+        const relevance = cand.score;
+        const diversity = selected.length ? Math.max(...selected.map(s => sim(cand, s))) : 0;
+        const mmr = (1 - lambda) * relevance - lambda * (diversity * 100);
+        if (mmr > bestScore) {
+          bestScore = mmr;
+          bestIdx = i;
+        }
+      }
+      selected.push(remaining.splice(bestIdx, 1)[0]);
     }
-
-    const coverage = totalWeight ? (covered / totalWeight) : 0;
-    const baseScore = totalWeight ? (sum / totalWeight) * 100 : 0;
-    const score = (0.85 * baseScore) + (0.15 * coverage * 100);
-    return { score, matches, gaps, coverage };
+    return selected;
   }
 
-  difficultyAlignmentScore(userYears, requiredLevelName) {
-    const userLevel = this.levelToNum(this.yearsToLevelName(userYears));
-    const reqLevel = this.levelToNum(this.yearsToLevelName(requiredLevelName));
-    
-    // ✅ IMPROVED: Less harsh penalty for being below required level
-    if (userLevel >= reqLevel) return 100;
-    
-    // Reduced penalty from 22 to 18 per level difference
-    return Math.max(0, 100 - (reqLevel - userLevel) * 18);
-  }
-
-  computeFeatures(user, project) {
-    const topic = this.topicCoverageScore(user.topics, project.project_topics || []);
-    const lang = this.languageProficiencyScore(user.programming_languages, project.project_languages || []);
-    const diff = this.difficultyAlignmentScore(user.years_experience, project.required_experience_level);
-    return { topic, lang, diff };
-  }
-
-  aggregateScore(f) {
-    let score =
-      this.weights.topicCoverage * (f.topic?.score || 0) +
-      this.weights.languageProficiency * (f.lang?.score || 0) +
-      this.weights.difficultyAlignment * (f.diff || 0);
-    return Math.max(0, Math.min(100, score));
-  }
-
-  // ============== LEGACY METHODS (kept for compatibility) ==============
+  // ============== LEGACY METHODS ==============
+  
   async calculateMatchScore(user, project) {
     try {
       const topicScore = this.calculateTopicMatch(user.topics, project.project_topics);
@@ -408,172 +523,11 @@ class SkillMatchingService {
     return this.buildMatchFactors(user, project, features);
   }
 
-  getTopicMatches(userTopics, projectTopics) {
-    const matches = [];
-    for (const projectTopic of projectTopics || []) {
-      const topicName = projectTopic.topics?.name;
-      const userTopic = userTopics.find(ut => ut.topics?.name === topicName);
-      if (userTopic) {
-        matches.push({
-          name: topicName,
-          userInterest: userTopic.interest_level,
-          userExperience: userTopic.experience_level,
-          isPrimary: projectTopic.is_primary
-        });
-      }
-    }
-    return matches;
-  }
-
-  getLanguageMatches(userLanguages, projectLanguages) {
-    const matches = [];
-    for (const projectLang of projectLanguages || []) {
-      const langName = projectLang.programming_languages?.name;
-      const userLang = userLanguages.find(ul => ul.programming_languages?.name === langName);
-      if (userLang) {
-        matches.push({
-          name: langName,
-          userProficiency: userLang.proficiency_level,
-          requiredLevel: projectLang.required_level,
-          isPrimary: projectLang.is_primary
-        });
-      }
-    }
-    return matches;
-  }
-
-  toNum(v) {
-    const n = Number(v);
-    if (!Number.isNaN(n)) return n;
-    const map = { beginner: 1, intermediate: 2, advanced: 3, expert: 4 };
-    return map[String(v).toLowerCase()] || 0;
-  }
-
-  buildMatchFactors(user, project, f) {
-    const topTopicMatches = [...(f.topic.matches || [])]
-      .sort((a, b) => (Number(b.is_primary) - Number(a.is_primary)) || (this.toNum(b.experience) - this.toNum(a.experience)))
-      .slice(0, 3);
-
-    const topLangMatches = [...(f.lang.matches || [])]
-      .filter(m => m.status === 'meets')
-      .sort((a, b) => (Number(b.is_primary) - Number(a.is_primary)) || (b.userProficiency - a.userProficiency))
-      .slice(0, 3);
-
-    const criticalGaps = [...(f.lang.gaps || []), ...(f.topic.missing || [])]
-      .sort((a, b) => (Number(b.is_primary) - Number(a.is_primary)))
-      .slice(0, 3);
-
-    return {
-      topicMatches: this.getTopicMatches(user.topics, project.project_topics || []),
-      languageMatches: this.getLanguageMatches(user.programming_languages, project.project_languages || []),
-      experienceMatch: {
-        userExperience: user.years_experience,
-        requiredExperience: project.required_experience_level,
-        isMatch: this.calculateExperienceMatch(user.years_experience, project.required_experience_level) >= 75
-      },
-      topicCoverage: {
-        score: Math.round(f.topic.score || 0),
-        matches: topTopicMatches,
-        missing: f.topic.missing || []
-      },
-      languageFit: {
-        score: Math.round(f.lang.score || 0),
-        coverage: Number(((f.lang.coverage || 0) * 100).toFixed(0)),
-        topMatches: topLangMatches,
-        gaps: criticalGaps
-      },
-      difficultyAlignment: {
-        score: Math.round(f.diff || 0),
-        userExperience: user.years_experience,
-        requiredExperience: project.required_experience_level
-      },
-      highlights: this.summarizeHighlights(topLangMatches, topTopicMatches),
-      suggestions: this.suggestImprovements(criticalGaps)
-    };
-  }
-
-  summarizeHighlights(langMatches, topicMatches) {
-    const bits = [];
-    if (langMatches.length) {
-      const primary = langMatches.find(l => l.is_primary) || langMatches[0];
-      if (primary) bits.push(`Strong fit in ${primary.name}`);
-    }
-    if (topicMatches.length) {
-      const primary = topicMatches.find(t => t.is_primary) || topicMatches[0];
-      if (primary) bits.push(`Good coverage on ${primary.name}`);
-    }
-    return bits;
-  }
-
-  suggestImprovements(gaps) {
-    if (!gaps?.length) return [];
-    return gaps.map(g => {
-      if (g.required != null) {
-        const need = Math.ceil((g.required * 5) - (g.userProficiency * 5));
-        if (g.status === 'missing') {
-          return `Add basics of ${g.name} (target ~${Math.max(2, Math.ceil(g.required * 5))}/5)`;
-        }
-        return `Level up ${g.name} by ~${Math.max(1, need)} step(s) to meet project needs`;
-      }
-      return `Explore topic ${g.name}`;
-    }).slice(0, 3);
-  }
-
-  diversityReRank(items, lambda = 0.25) {
-    if (items.length <= 1) return items;
-    
-    const selected = [];
-    const remaining = [...items];
-    const sim = (a, b) => {
-      const setA = new Set([...(a.technologies || [])]);
-      const setB = new Set([...(b.technologies || [])]);
-      const inter = [...setA].filter(x => setB.has(x)).length;
-      const uni = new Set([...setA, ...setB]).size || 1;
-      return inter / uni;
-    };
-
-    while (remaining.length) {
-      let bestIdx = 0;
-      let bestScore = -Infinity;
-      for (let i = 0; i < remaining.length; i++) {
-        const cand = remaining[i];
-        const relevance = cand.score;
-        const diversity = selected.length ? Math.max(...selected.map(s => sim(cand, s))) : 0;
-        const mmr = (1 - lambda) * relevance - lambda * (diversity * 100);
-        if (mmr > bestScore) {
-          bestScore = mmr;
-          bestIdx = i;
-        }
-      }
-      selected.push(remaining.splice(bestIdx, 1)[0]);
-    }
-    return selected;
-  }
-
-  async storeRecommendations(userId, recommendations) {
-    try {
-      const records = recommendations.map(rec => ({
-        user_id: userId,
-        project_id: rec.projectId,
-        score: rec.score,
-        match_factors: rec.matchFactors,
-        created_at: new Date().toISOString()
-      }));
-
-      await supabase.from('recommendations').upsert(records, {
-        onConflict: 'user_id,project_id'
-      });
-    } catch (error) {
-      console.error('Failed to store recommendations:', error);
-    }
-  }
-
   clearCache() {
     this.projectCache = null;
     this.projectCacheTime = 0;
   }
 
-  // ✅ NEW: Get current thresholds (for debugging/testing)
   getThresholds() {
     return {
       recommendationThreshold: this.recommendationThreshold,
