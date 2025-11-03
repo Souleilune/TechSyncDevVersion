@@ -13,7 +13,8 @@
     "test:assessment": "node scripts/testSkillAssessmentAlgorithm.js",
     "check:db": "node scripts/checkDatabaseStats.js",
     "paper:separate-tables": "node scripts/testRecommendationScalability_SeparateTables.js",
-    "rejection:confusion": "node scripts/testRejectionLearningConfusionMatrix.js"
+    "rejection:confusion": "node scripts/testRejectionLearningConfusionMatrix.js",
+    "test:chatbot": "node scripts/testAIChatbotPerformance.js"
 
 
   },
