@@ -493,50 +493,116 @@ function ProjectMembers() {
   };
 
   const handleUpdateRole = async (memberId, newRole) => {
+  try {
+    // Find the member being updated to get their name
+    const member = memberData?.members?.find(m => m.id === memberId);
+    const memberName = member?.users?.full_name || member?.users?.username || 'Unknown';
+    const oldRole = member?.role || 'member';
+    
+    // Update the role
+    await projectService.updateMemberRole(projectId, memberId, newRole);
+    
+    // ✅ LOG ACTIVITY
     try {
-      await projectService.updateMemberRole(projectId, memberId, newRole);
-      
-      const membersResponse = await projectService.getProjectMembers(projectId);
-      setMemberData(membersResponse.data);
-      
-      setError(null);
-    } catch (error) {
-      console.error('Error updating role:', error);
-      setError(error.response?.data?.message || 'Failed to update member role');
+      await projectService.logActivity(projectId, {
+        action: 'updated role',
+        target: `${memberName} from ${oldRole} to ${newRole}`,
+        type: 'project_updated',
+        metadata: { 
+          memberId,
+          memberName,
+          oldRole,
+          newRole
+        }
+      });
+      console.log('✅ Activity logged for role update');
+    } catch (activityError) {
+      console.error('Failed to log activity:', activityError);
     }
-  };
+    
+    // Refresh member data
+    const membersResponse = await projectService.getProjectMembers(projectId);
+    setMemberData(membersResponse.data);
+    
+    setError(null);
+  } catch (error) {
+    console.error('Error updating role:', error);
+    setError(error.response?.data?.message || 'Failed to update member role');
+  }
+};
 
   const handleRemoveMember = async (memberId, memberName) => {
-    if (!window.confirm(`Are you sure you want to remove ${memberName} from this project?`)) {
-      return;
-    }
+  if (!window.confirm(`Are you sure you want to remove ${memberName} from this project?`)) {
+    return;
+  }
 
+  try {
+    // Find the member to get their role
+    const member = memberData?.members?.find(m => m.id === memberId);
+    const memberRole = member?.role || 'member';
+    
+    // Remove the member
+    await projectService.removeMember(projectId, memberId);
+    
+    // ✅ LOG ACTIVITY
     try {
-      await projectService.removeMember(projectId, memberId);
-      
-      const membersResponse = await projectService.getProjectMembers(projectId);
-      setMemberData(membersResponse.data);
-      
-      setError(null);
-    } catch (error) {
-      console.error('Error removing member:', error);
-      setError(error.response?.data?.message || 'Failed to remove member');
+      await projectService.logActivity(projectId, {
+        action: 'removed member',
+        target: `${memberName} (${memberRole})`,
+        type: 'project_updated',
+        metadata: { 
+          memberId,
+          memberName,
+          memberRole,
+          removedBy: user?.id
+        }
+      });
+      console.log('✅ Activity logged for member removal');
+    } catch (activityError) {
+      console.error('Failed to log activity:', activityError);
     }
-  };
+    
+    // Refresh member data
+    const membersResponse = await projectService.getProjectMembers(projectId);
+    setMemberData(membersResponse.data);
+    
+    setError(null);
+  } catch (error) {
+    console.error('Error removing member:', error);
+    setError(error.response?.data?.message || 'Failed to remove member');
+  }
+};
 
   const handleLeaveProject = async () => {
-    if (!window.confirm('Are you sure you want to leave this project?')) {
-      return;
-    }
+  if (!window.confirm('Are you sure you want to leave this project?')) {
+    return;
+  }
 
+  try {
+    // ✅ LOG ACTIVITY BEFORE LEAVING (so user still has permission)
     try {
-      await projectService.leaveProject(projectId);
-      window.location.href = '/projects';
-    } catch (error) {
-      console.error('Error leaving project:', error);
-      setError(error.response?.data?.message || 'Failed to leave project');
+      await projectService.logActivity(projectId, {
+        action: 'left project',
+        target: user?.full_name || user?.username || 'Unknown',
+        type: 'project_updated',
+        metadata: { 
+          userId: user?.id,
+          userName: user?.full_name || user?.username
+        }
+      });
+      console.log('✅ Activity logged for leaving project');
+    } catch (activityError) {
+      console.error('Failed to log activity:', activityError);
     }
-  };
+    
+    // Leave the project
+    await projectService.leaveProject(projectId);
+    window.location.href = '/projects';
+  } catch (error) {
+    console.error('Error leaving project:', error);
+    setError(error.response?.data?.message || 'Failed to leave project');
+  }
+};
 
   const members = memberData?.members || [];
   const owner = memberData?.owner || null;

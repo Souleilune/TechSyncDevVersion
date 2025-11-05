@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import ChallengeFailureAlert from './ChallengeFailureAlert';
 import TestResultsPanel from './TestResultsPanel';
 import ChallengeHints from './ChallengeHints';
+import { projectService } from '../services/projectService';
 
 const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
   const navigate = useNavigate();

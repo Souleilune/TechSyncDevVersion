@@ -360,15 +360,16 @@ function CreateProject({ onClose }) {
     const response = await projectService.createProject(projectData);
     
     if (response.success) {
-      try {
-                await projectService.logActivity(projectId, {
-                    action: 'updated project',
-                    target: 'Project information',
-                    type: 'project_updated',
-                    metadata: { 
-                        updatedFields: Object.keys(updatedData)
-                    }
-                });
+       try {
+    await projectService.logActivity(response.data.project.id, {  // ✅ Use response.data.project.id
+      action: 'created project',  // ✅ Changed to 'created project'
+      target: response.data.project.title,  // ✅ Use project title
+      type: 'project_updated',
+      metadata: { 
+        projectId: response.data.project.id,  // ✅ Add projectId to metadata
+        title: projectData.title
+      }
+    });
                 console.log('✅ Activity logged for project update');
             } catch (activityError) {
                 console.error('Failed to log activity:', activityError);

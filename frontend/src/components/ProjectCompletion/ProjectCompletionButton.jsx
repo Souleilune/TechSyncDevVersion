@@ -11,6 +11,8 @@ import {
   AlertTriangle 
 } from 'lucide-react';
 import collaborativeProjectCompletionService from '../../services/collaborativeProjectCompletionService';
+import { projectService } from '../../services/projectService'; // ✅ ADD THIS
+
 
 /**
  * ProjectCompletionButton Component
@@ -67,72 +69,112 @@ const ProjectCompletionButton = ({
   }, [projectId]);
 
   // Handle mark complete
-  const handleMarkComplete = async (skipValidation = false) => {
+const handleMarkComplete = async (skipValidation = false) => {
+  try {
+    setActionLoading(true);
+    setError(null);
+    
+    const response = await collaborativeProjectCompletionService.markProjectComplete(
+      projectId, 
+      skipValidation
+    );
+    
+    // ✅ LOG ACTIVITY
     try {
-      setActionLoading(true);
-      setError(null);
-      
-      const response = await collaborativeProjectCompletionService.markProjectComplete(
-        projectId, 
-        skipValidation
-      );
-      
-      setSuccessMessage(response.message || 'Project marked as complete!');
-      setShowModal(false);
-      
-      // Refresh status
-      await fetchCompletionStatus();
-      
-      // Notify parent component
-      if (onProjectCompleted) {
-        onProjectCompleted();
-      }
-
-      // Show success for 3 seconds
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err) {
-      console.error('Error marking complete:', err);
-      setError(err.response?.data?.message || 'Failed to mark project complete');
-    } finally {
-      setActionLoading(false);
+      await projectService.logActivity(projectId, {
+        action: 'marked project as complete',
+        target: completionStatus?.project_title || 'project',
+        type: 'project_updated',
+        metadata: { 
+          skipValidation,
+          completionPercentage: completionStatus?.completion_percentage || 0,
+          manualCompletion: true
+        }
+      });
+      console.log('✅ Activity logged for manual completion');
+    } catch (activityError) {
+      console.error('Failed to log activity:', activityError);
     }
-  };
+    
+    setSuccessMessage(response.message || 'Project marked as complete!');
+    setShowModal(false);
+    
+    // Refresh status
+    await fetchCompletionStatus();
+    
+    // Notify parent component
+    if (onProjectCompleted) {
+      onProjectCompleted();
+    }
+
+    // Show success for 3 seconds
+    setTimeout(() => setSuccessMessage(null), 3000);
+  } catch (err) {
+    console.error('Error marking complete:', err);
+    setError(err.response?.data?.message || 'Failed to mark project complete');
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   // Handle vote
-  const handleVote = async (vote) => {
+  // Handle vote
+const handleVote = async (vote) => {
+  try {
+    setActionLoading(true);
+    setError(null);
+    
+    const response = await collaborativeProjectCompletionService.voteOnCompletion(
+      projectId, 
+      vote
+    );
+    
+    // ✅ LOG ACTIVITY
     try {
-      setActionLoading(true);
-      setError(null);
-      
-      const response = await collaborativeProjectCompletionService.voteOnCompletion(
-        projectId, 
-        vote
-      );
-      
-      setSuccessMessage(
-        response.data.auto_completed 
-          ? 'Project completed by team vote!' 
-          : `Vote recorded: ${vote === 'approve' ? 'Approved' : 'Rejected'}`
-      );
-      
-      // Refresh data
-      await fetchCompletionStatus();
-      await fetchVotes();
-      
-      // Notify parent if auto-completed
-      if (response.data.auto_completed && onProjectCompleted) {
-        onProjectCompleted();
-      }
-
-      // Show success for 3 seconds
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err) {
-      console.error('Error voting:', err);
-      setError(err.response?.data?.message || 'Failed to record vote');
-    } finally {
-      setActionLoading(false);
+      await projectService.logActivity(projectId, {
+        action: vote === 'approve' ? 'voted to approve completion' : 'voted to reject completion',
+        target: completionStatus?.project_title || 'project completion',
+        type: 'project_updated',
+        metadata: { 
+          vote,
+          autoCompleted: response.data.auto_completed || false,
+          votesFor: response.data.votes_for || 0,
+          votesAgainst: response.data.votes_against || 0,
+          totalVotes: response.data.total_votes || 0,
+          votesNeeded: response.data.votes_needed || 0
+        }
+      });
+      console.log('✅ Activity logged for completion vote');
+    } catch (activityError) {
+      console.error('Failed to log activity:', activityError);
     }
-  };
+    
+    setSuccessMessage(
+      response.data.auto_completed 
+        ? 'Project completed by team vote!' 
+        : `Vote recorded: ${vote === 'approve' ? 'Approved' : 'Rejected'}`
+    );
+    
+    setShowVotingModal(false);
+    
+    // Refresh status and votes
+    await fetchCompletionStatus();
+    await fetchVotes();
+    
+    // If auto-completed, notify parent
+    if (response.data.auto_completed && onProjectCompleted) {
+      onProjectCompleted();
+    }
+
+    // Show success for 3 seconds
+    setTimeout(() => setSuccessMessage(null), 3000);
+  } catch (err) {
+    console.error('Error voting:', err);
+    setError(err.response?.data?.message || 'Failed to record vote');
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   // Show voting modal
   const openVotingModal = async () => {

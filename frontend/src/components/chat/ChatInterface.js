@@ -75,24 +75,44 @@ const ChatInterface = ({ projectId }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSendMessage = () => {
-    if (!messageInput.trim() || !activeRoom) return;
+  const handleSendMessage = async () => {  // ✅ Make it async
+  if (!messageInput.trim() || !activeRoom) return;
 
-    if (editingMessage) {
-      editMessage(editingMessage.id, messageInput);
-      setEditingMessage(null);
-    } else {
-      sendMessage(activeRoom, messageInput, 'text', replyingTo?.id);
-      setReplyingTo(null);
+  if (editingMessage) {
+    editMessage(editingMessage.id, messageInput);
+    setEditingMessage(null);
+  } else {
+    // Send the message
+    sendMessage(activeRoom, messageInput, 'text', replyingTo?.id);
+    setReplyingTo(null);
+    
+    // ✅ LOG ACTIVITY - Add this block
+    try {
+      const { projectService } = await import('../../services/projectService');
+      await projectService.logActivity(projectId, {
+        action: 'sent message',
+        target: messageInput.length > 50 
+          ? messageInput.substring(0, 50) + '...' 
+          : messageInput,
+        type: 'message_sent',
+        metadata: { 
+          roomId: activeRoom,
+          roomName: activeRoomData?.name || 'Unknown Room'
+        }
+      });
+      console.log('✅ Activity logged for message send');
+    } catch (activityError) {
+      console.error('Failed to log activity:', activityError);
+      // Don't block message sending if activity logging fails
     }
+  }
 
-    setMessageInput('');
-    if (typingTimer) {
-      clearTimeout(typingTimer);
-      stopTyping(activeRoom);
-    }
-  };
-
+  setMessageInput('');
+  if (typingTimer) {
+    clearTimeout(typingTimer);
+    stopTyping(activeRoom);
+  }
+};
   const handleInputChange = (e) => {
     setMessageInput(e.target.value);
     

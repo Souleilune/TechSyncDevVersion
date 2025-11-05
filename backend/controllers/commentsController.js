@@ -276,15 +276,67 @@ class CommentsController {
 
             console.log('✅ Comment created successfully:', comment);
 
-            // Try to create notifications (but don't fail if this fails)
-            try {
-                await this.createCommentNotifications(comment, task.project_id);
-                console.log('✅ Notifications created');
-            } catch (notifError) {
-                console.error('⚠️ Notification error (non-fatal):', notifError);
-            }
+// Try to create notifications (but don't fail if this fails)
+try {
+    await this.createCommentNotifications(comment, task.project_id);
+    console.log('✅ Notifications created');
+} catch (notifError) {
+    console.error('⚠️ Notification error (non-fatal):', notifError);
+}
 
-            res.status(201).json({ comment });
+// ✅ LOG ACTIVITY FOR COMMENT
+try {
+    let actionText = 'commented on';
+    let targetText = `"${task.title}"`;
+    const metadata = {
+        taskId: task.id,
+        taskTitle: task.title,
+        commentId: comment.id,
+        commentPreview: sanitizedContent.substring(0, 50) + (sanitizedContent.length > 50 ? '...' : ''),
+        isReply: !!parentCommentId
+    };
+
+    // If mentions exist, highlight them
+    if (validMentions && validMentions.length > 0) {
+        const { data: mentionedUsers } = await supabase
+            .from('users')
+            .select('id, full_name, username')
+            .in('id', validMentions);
+
+        if (mentionedUsers && mentionedUsers.length > 0) {
+            const mentionNames = mentionedUsers.map(u => u.full_name || u.username).join(', ');
+            actionText = 'mentioned';
+            targetText = `${mentionNames} in "${task.title}"`;
+            metadata.mentionedUserIds = validMentions;
+            metadata.mentionedUsers = mentionNames;
+            metadata.mentionCount = validMentions.length;
+        }
+    }
+
+    // If it's a reply, mention that
+    if (parentCommentId) {
+        actionText = 'replied to comment on';
+    }
+
+    await supabase
+        .from('user_activity')
+        .insert({
+            user_id: userId,
+            project_id: task.project_id,
+            activity_type: 'message_sent',
+            activity_data: {
+                action: actionText,
+                target: targetText,
+                metadata
+            }
+        });
+    
+    console.log('✅ Activity logged for comment');
+} catch (activityError) {
+    console.error('⚠️ Activity logging error (non-fatal):', activityError);
+}
+
+res.status(201).json({ comment });
 
         } catch (error) {
             console.error('💥 Error in createComment:', error);
