@@ -60,7 +60,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
 
   // Debug: Log project data to see available fields
   console.log('ProjectDetailModal - Project data:', project);
-  console.log('ProjectDetailModal - All project keys:', Object.keys(project));
+  console.log('ProjectDetailModal - All project keys:', project ? Object.keys(project) : []);
   console.log('ProjectDetailModal - Owner data:', project?.owner);
   console.log('ProjectDetailModal - Users data:', project?.users);
   console.log('ProjectDetailModal - Owner ID:', project?.owner_id);
@@ -71,10 +71,17 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
 
   if (!isOpen || !project) return null;
 
-  const handleJoinClick = async () => {
+  // FIXED: Accept event parameter and pass it to onJoin
+  const handleJoinClick = async (e) => {
+    e.stopPropagation();
+    
+    if (isLocked) {
+      return;
+    }
+    
     setIsJoining(true);
     try {
-      await onJoin(project);
+      await onJoin(project, e);
     } finally {
       setIsJoining(false);
     }
@@ -174,7 +181,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                 Detailed Overview
               </h3>
               <div style={styles.fullDescription}>
-                {project.full_description.split('\n').map((paragraph, idx) => (
+                {(project.full_description || '').split('\n').map((paragraph, idx) => (
                   <p key={idx} style={styles.paragraph}>{paragraph}</p>
                 ))}
               </div>
@@ -271,9 +278,9 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                 Technologies & Languages
               </h3>
               <div style={styles.techGrid}>
-                {project.project_languages.map((lang, index) => (
+                {(project.project_languages || []).map((lang, index) => (
                   <div key={index} style={styles.techTag}>
-                    {lang.programming_languages?.name || lang.name}
+                    {lang.programming_languages?.name || lang.name || 'Unknown'}
                   </div>
                 ))}
               </div>
@@ -288,22 +295,23 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                 Project Topics
               </h3>
               <div style={styles.techGrid}>
-                {project.project_topics.map((topic, index) => (
+                {(project.project_topics || []).map((topic, index) => (
                   <div key={index} style={styles.topicTag}>
-                    {topic.topics?.name || topic.name}
+                    {topic.topics?.name || topic.name || 'Unknown'}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Match Insights */}
-          {(mf.suggestions?.length > 0 || mf.languageFit || mf.topicCoverage) && (
+          {/* Match Insights Section */}
+          {mf && Object.keys(mf).length > 0 && (
             <div style={styles.section}>
               <h3 style={styles.sectionTitle}>
                 <Sparkles size={18} />
-                Why This Project?
+                Why This Matches You
               </h3>
+              
               <div style={styles.insightsGrid}>
                 {mf.languageFit && (
                   <div style={styles.insightCard}>
@@ -312,28 +320,28 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                       <span>Language Match</span>
                     </div>
                     <div style={styles.insightValue}>
-                      {mf.languageFit.coverage}% Match
+                      {mf.languageFit.coverage}% Compatible
                     </div>
-                    {mf.languageFit.matchedLanguages?.length > 0 && (
-                      <div style={styles.insightDetail}>
-                        Matches: {mf.languageFit.matchedLanguages.join(', ')}
-                      </div>
-                    )}
+                    <div style={styles.insightDetail}>
+                      {(mf.languageFit.matches || []).map(
+                        m => m.programming_languages?.name || m.name || 'Unknown'
+                      ).join(', ')}
+                    </div>
                   </div>
                 )}
-                
-                {mf.topicCoverage?.matches && mf.topicCoverage.matches.length > 0 && (
+
+                {mf.topicCoverage && mf.topicCoverage.matches?.length > 0 && (
                   <div style={styles.insightCard}>
                     <div style={styles.insightHeader}>
                       <Target size={16} />
                       <span>Topic Alignment</span>
                     </div>
                     <div style={styles.insightValue}>
-                      {mf.topicCoverage.matches.length} matching interests
+                      {mf.topicCoverage.matches.length} Matches
                     </div>
                     <div style={styles.insightDetail}>
-                      Your interests: {mf.topicCoverage.matches.slice(0, 3).map(topic => 
-                        typeof topic === 'string' ? topic : topic?.name || topic?.topics?.name || 'Unknown'
+                      {(mf.topicCoverage.matches || []).map(
+                        topic => topic?.name || topic?.topics?.name || 'Unknown'
                       ).join(', ')}
                     </div>
                   </div>
@@ -362,7 +370,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                     💡 To boost your match score:
                   </div>
                   <ul style={styles.suggestionsList}>
-                    {mf.suggestions.map((suggestion, idx) => (
+                    {(mf.suggestions || []).map((suggestion, idx) => (
                       <li key={idx} style={styles.suggestionItem}>
                         {suggestion}
                       </li>
@@ -472,19 +480,18 @@ const styles = {
     fontWeight: '600',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     color: '#d1d5db',
-    border: '1px solid rgba(255, 255, 255, 0.2)'
   },
   closeButton: {
-    background: 'transparent',
+    background: 'none',
     border: 'none',
     color: '#9ca3af',
     cursor: 'pointer',
-    padding: '8px',
+    padding: '4px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '8px',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s'
   },
   matchBanner: {
     display: 'flex',
@@ -492,14 +499,14 @@ const styles = {
     alignItems: 'center',
     padding: '12px 16px',
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderRadius: '10px',
+    borderRadius: '12px',
     border: '1px solid rgba(59, 130, 246, 0.3)'
   },
   matchScore: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    color: '#3b82f6'
+    color: '#60a5fa'
   },
   matchScoreText: {
     fontSize: '18px',
@@ -507,12 +514,12 @@ const styles = {
   },
   matchDetails: {
     display: 'flex',
-    gap: '16px',
-    alignItems: 'center'
+    gap: '12px',
+    fontSize: '13px'
   },
   matchDetail: {
-    fontSize: '13px',
-    color: '#9ca3af'
+    color: '#93c5fd',
+    fontWeight: '500'
   },
   content: {
     padding: '24px',
@@ -532,19 +539,18 @@ const styles = {
     marginBottom: '12px'
   },
   description: {
-    color: '#d1d5db',
     fontSize: '14px',
     lineHeight: '1.6',
+    color: '#d1d5db',
     margin: 0
   },
   fullDescription: {
-    color: '#d1d5db',
     fontSize: '14px',
-    lineHeight: '1.6'
+    lineHeight: '1.6',
+    color: '#d1d5db'
   },
   paragraph: {
-    marginBottom: '12px',
-    margin: '0 0 12px 0'
+    marginBottom: '12px'
   },
   statsGrid: {
     display: 'grid',
