@@ -222,17 +222,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
               </div>
             )}
 
-            <div style={styles.statCard}>
-              <div style={styles.statIcon}>
-                <Clock size={20} style={{ color: '#3b82f6' }} />
-              </div>
-              <div style={styles.statContent}>
-                <div style={styles.statLabel}>Duration</div>
-                <div style={styles.statValue}>
-                  {project.estimated_duration_weeks} weeks
-                </div>
-              </div>
-            </div>
+            
 
             <div style={styles.statCard}>
               <div style={styles.statIcon}>
@@ -322,7 +312,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                       <span>Language Match</span>
                     </div>
                     <div style={styles.insightValue}>
-                      {mf.languageFit.coverage}% coverage
+                      {mf.languageFit.coverage}% Match
                     </div>
                     {mf.languageFit.matchedLanguages?.length > 0 && (
                       <div style={styles.insightDetail}>
@@ -342,7 +332,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                       {mf.topicCoverage.matches.length} matching interests
                     </div>
                     <div style={styles.insightDetail}>
-                      {mf.topicCoverage.matches.slice(0, 3).map(topic => 
+                      Your interests: {mf.topicCoverage.matches.slice(0, 3).map(topic => 
                         typeof topic === 'string' ? topic : topic?.name || topic?.topics?.name || 'Unknown'
                       ).join(', ')}
                     </div>
@@ -359,7 +349,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                       Good fit for your experience
                     </div>
                     <div style={styles.insightDetail}>
-                      Your level: {mf.difficultyAlignment.userExperience || 'Not set'}
+                      Your programming experience: {mf.difficultyAlignment.userExperience || 'Not set'} years
                     </div>
                   </div>
                 )}
