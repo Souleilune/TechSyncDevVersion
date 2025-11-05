@@ -9,6 +9,7 @@ import CreateProject from './CreateProject';
 import NotificationDropdown from '../components/Notifications/NotificationDropdown';
 import AIChatInterface from '../components/AIChat/AIChatInterface';
 import ProjectChallengeInterface from '../components/ProjectChallengeInterface'; // ADD THIS IMPORT
+import ProjectDetailModal from '../components/ProjectDetailModal';
 import { Plus, Bell, Rocket, Code, Users, BookOpen, HelpCircle, LockKeyhole, PanelLeft } from 'lucide-react';
 
 const formatSkillsDescription = (user) => {
@@ -588,6 +589,9 @@ function Dashboard() {
   const [filterLanguage, setFilterLanguage] = useState('all');
   const [filterDifficulty, setFilterDifficulty] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  // Add these new states for project detail modal
+  const [showProjectDetailModal, setShowProjectDetailModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
   
   // NEW STATE: For AI chat project preview modal at dashboard level
   const [showAIProjectPreview, setShowAIProjectPreview] = useState(false);
@@ -1113,13 +1117,16 @@ useEffect(() => {
         project.projectId
       );
       
-      navigate(`/projects/${project.projectId}`);
     } catch (error) {
       console.error('Error updating recommendation feedback:', error);
-      navigate(`/projects/${project.projectId}`);
     }
+    setSelectedProject(project);
+    setShowProjectDetailModal(true);
   };
-
+    const handleCloseProjectDetail = () => {
+      setShowProjectDetailModal(false);
+      setSelectedProject(null);
+    };
   // MODIFY THE handleJoinProject FUNCTION TO SHOW MODAL INSTEAD OF NAVIGATE
   const handleJoinProject = async (project, event) => {
     event.stopPropagation();
@@ -1135,6 +1142,9 @@ useEffect(() => {
       } catch (feedbackError) {
         console.warn('Failed to update recommendation feedback:', feedbackError);
       }
+
+      setShowProjectDetailModal(false);
+      setSelectedProject(null);
       
       // CHANGED: Show modal instead of navigate
       setSelectedProjectForChallenge(project);
@@ -2788,6 +2798,23 @@ useEffect(() => {
             onSuccess={handleChallengeSuccess}
           />
         </div>,
+        document.body
+      )}
+
+      {showProjectDetailModal && selectedProject && createPortal(
+        <ProjectDetailModal
+          project={selectedProject}
+          isOpen={showProjectDetailModal}
+          onClose={handleCloseProjectDetail}
+          onJoin={handleJoinProject}
+          isLocked={Boolean(
+            selectedProject?.matchFactors?.needsBoost ??
+            (
+              (selectedProject?.matchFactors?.suggestions?.length || 0) > 0 &&
+              (selectedProject?.score || 0) < 70
+            )
+          )}
+        />,
         document.body
       )}
 
