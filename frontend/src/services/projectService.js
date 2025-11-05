@@ -141,5 +141,26 @@ export const projectService = {
       console.error('Join project error:', error.response?.data || error.message);
       throw error;
     }
+  },
+  // Get recent activity for a project
+  getRecentActivity: async (projectId, limit = 10) => {
+    try {
+      const response = await api.get(`/projects/${projectId}/recent-activity?limit=${limit}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get recent activity error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Log activity for a project
+  logActivity: async (projectId, activityData) => {
+    try {
+      const response = await api.post(`/projects/${projectId}/activity`, activityData);
+      return response.data;
+    } catch (error) {
+      console.error('Log activity error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 };

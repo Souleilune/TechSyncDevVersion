@@ -7,7 +7,9 @@ const {
   getProjectById,
   getUserProjects,
   deleteProject,
-  updateProject
+  updateProject,
+  getRecentActivity,
+  logActivity
 } = require('../controllers/projectController');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
@@ -189,5 +191,33 @@ router.use((error, req, res, next) => {
     error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
   });
 });
+
+router.get(
+  '/:id/recent-activity',
+  authMiddleware,
+  projectIdValidation,
+  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
+  handleValidationErrors,
+  getRecentActivity
+);
+
+router.post(
+  '/:id/activity',
+  authMiddleware,
+  projectIdValidation,
+  body('action')
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Action must be between 1 and 100 characters'),
+  body('target')
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Target must be between 1 and 200 characters'),
+  body('type')
+    .isIn(['task_completed', 'task_started', 'task_created', 'member_joined', 'project_updated', 'file_uploaded','message_sent'])
+    .withMessage('Invalid activity type'),
+  handleValidationErrors,
+  logActivity
+);
 
 module.exports = router;

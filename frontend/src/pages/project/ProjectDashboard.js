@@ -5,7 +5,7 @@ import { projectService } from '../../services/projectService';
 import ProjectCompletionButton from '../../components/ProjectCompletion/ProjectCompletionButton';
 import { taskService } from '../../services/taskService';
 import { useAuth } from '../../contexts/AuthContext';
-import { PanelLeft } from 'lucide-react';
+import { Clock, CheckCircle, FileText, UserPlus, Edit, Upload, PanelLeft } from 'lucide-react';
 
 // Background symbols component - WITH FLOATING ANIMATIONS
 const BackgroundSymbols = () => (
@@ -541,63 +541,62 @@ function ProjectDashboard() {
   }, [fetchDashboardData]);
 
   // Mock member activity (in real app, this would come from activity logs)
-  const fetchMemberActivity = useCallback(async () => {
-    try {
-      setLoadingActivity(true);
+  // Fetch member activity using backend API
+const fetchMemberActivity = useCallback(async () => {
+  try {
+    setLoadingActivity(true);
+    
+    console.log('🔍 Fetching activity for project:', projectId);
+    
+    // Fetch real activity data from backend
+    const response = await projectService.getRecentActivity(projectId, 10);
+    
+    console.log('📦 Activity API Response:', response);
+    
+    if (response.success) {
+      console.log('✅ Activities found:', response.data.activities.length);
       
-      // Simulate recent activity data
-      const mockActivity = [
-        {
-          id: 1,
-          user: members.find(m => m.id === user?.id) || { full_name: 'You', username: 'you' },
-          action: 'completed task',
-          target: 'Setup project structure',
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          type: 'task_completed'
-        },
-        {
-          id: 2,
-          user: members[1] || { full_name: 'Team Member', username: 'member' },
-          action: 'created task',
-          target: 'Implement authentication',
-          timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-          type: 'task_created'
-        },
-        {
-          id: 3,
-          user: members[0] || { full_name: 'Project Owner', username: 'owner' },
-          action: 'updated project',
-          target: 'Project description',
-          timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-          type: 'project_updated'
-        },
-        {
-          id: 4,
-          user: members[1] || { full_name: 'Team Member', username: 'member' },
-          action: 'joined project',
-          target: '',
-          timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-          type: 'member_joined'
-        }
-      ].filter(activity => activity.user);
-
-      setMemberActivity(mockActivity);
-    } catch (error) {
-      console.error('Error fetching member activity:', error);
-    } finally {
-      setLoadingActivity(false);
+      // Transform the data to match the expected format
+      const formattedActivities = response.data.activities.map(activity => {
+        console.log('🔄 Processing activity:', activity);
+        
+        // Parse activity_data to get action and target
+        const activityData = activity.activity_data || {};
+        const action = activityData.action || 'performed action';
+        const target = activityData.target || '';
+        
+        return {
+          id: activity.id,
+          user: activity.users || { full_name: 'Unknown User', username: 'unknown' },
+          action: action,
+          target: target,
+          timestamp: new Date(activity.created_at),
+          type: activity.activity_type
+        };
+      });
+      
+      console.log('✨ Formatted activities:', formattedActivities);
+      setMemberActivity(formattedActivities);
+    } else {
+      console.log('❌ API returned success: false');
+      setMemberActivity([]);
     }
-  }, [members, user]);
+  } catch (error) {
+    console.error('💥 Error fetching member activity:', error);
+    console.error('Error details:', error.response?.data || error.message);
+    setMemberActivity([]);
+  } finally {
+    setLoadingActivity(false);
+  }
+}, [projectId]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+  fetchDashboardData();
+}, [fetchDashboardData]);
 
-  useEffect(() => {
-    if (members.length > 0) {
-      fetchMemberActivity();
-    }
-  }, [fetchMemberActivity, members.length]);
+useEffect(() => {
+  fetchMemberActivity();
+}, [fetchMemberActivity]);
 
   // Helper functions
   const formatTimeAgo = (timestamp) => {
@@ -624,14 +623,23 @@ function ProjectDashboard() {
   };
 
   const getActivityIcon = (type) => {
-    switch (type) {
-      case 'task_completed': return '✅';
-      case 'task_created': return '📝';
-      case 'project_updated': return '📊';
-      case 'member_joined': return '👋';
-      default: return '📄';
-    }
-  };
+  switch(type) {
+    case 'task_completed':
+      return <CheckCircle size={20} color="#10b981" />;
+    case 'task_created':
+      return <FileText size={20} color="#3b82f6" />;
+    case 'task_started':
+      return <Clock size={20} color="#f59e0b" />;
+    case 'project_updated':
+      return <Edit size={20} color="#8b5cf6" />;
+    case 'member_joined':
+      return <UserPlus size={20} color="#06b6d4" />;
+    case 'file_uploaded':
+      return <Upload size={20} color="#ec4899" />;
+    default:
+      return <Clock size={20} color="#9ca3af" />;
+  }
+};
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -763,7 +771,7 @@ function ProjectDashboard() {
       display: 'grid',
       gridTemplateColumns: '2fr 1fr',
       gap: '30px',
-      marginBottom: '30px'
+      marginBottom: '24px'
     },
     announcementsSection: {
       position: 'relative',
@@ -776,7 +784,8 @@ function ProjectDashboard() {
       borderRadius: '16px',
       padding: '25px',
       backdropFilter: 'blur(20px)',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+      marginBottom: '20px'
     },
     cardTitle: {
       color: 'white',
@@ -837,7 +846,8 @@ function ProjectDashboard() {
       borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
     },
     activityIcon: {
-      fontSize: '20px',
+      display: 'flex',
+      alignItems: 'center',
       marginTop: '2px'
     },
     activityContent: {
@@ -1133,7 +1143,8 @@ function ProjectDashboard() {
           <div>
             <div style={styles.card}>
               <h3 style={styles.cardTitle}>
-                🕒 Recent Activity
+                <Clock size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                Recent Activity
               </h3>
               {loadingActivity ? (
                 <div style={styles.emptyState}>Loading activity...</div>

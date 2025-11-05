@@ -598,6 +598,7 @@ const updateProject = async (req, res) => {
 };
 
 // Delete project (only by owner) - COMPLETELY FIXED
+// Delete project (only by owner) - COMPLETELY FIXED
 const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
@@ -727,7 +728,7 @@ const deleteProject = async (req, res) => {
 
     // FIXED: Delete challenge attempts using correct table name
     await supabase
-      .from('challenge_attempts') // FIXED: was 'coding_attempts'
+      .from('challenge_attempts')
       .delete()
       .eq('project_id', id);
 
@@ -798,6 +799,129 @@ const deleteProject = async (req, res) => {
       error: error.message
     });
   }
+}; // ← CLOSE deleteProject HERE
+
+// ← ADD getRecentActivity OUTSIDE, NOT INSIDE deleteProject
+const getRecentActivity = async (req, res) => {
+  try {
+    const { id } = req.params; // ← Changed from projectId to id
+    const { limit = 10 } = req.query;
+    const userId = req.user.id;
+
+    console.log('📋 Getting recent activity for team project:', id);
+
+    // Verify user is a member of the project
+    const { data: membership, error: memberError } = await supabase
+      .from('project_members')
+      .select('id')
+      .eq('project_id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (memberError || !membership) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not a member of this project'
+      });
+    }
+
+    // Fetch recent activity from the user_activity table for this project
+    const { data: activities, error: activitiesError } = await supabase
+      .from('user_activity')
+      .select(`
+        *,
+        users (id, username, full_name, avatar_url)
+      `)
+      .eq('project_id', id)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit));
+
+    if (activitiesError) {
+      console.error('Error fetching activities:', activitiesError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch recent activity'
+      });
+    }
+
+    console.log('✅ Recent activity retrieved successfully');
+
+    res.json({
+      success: true,
+      data: { activities: activities || [] }
+    });
+
+  } catch (error) {
+    console.error('💥 Get recent activity error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch recent activity'
+    });
+  }
+};
+
+const logActivity = async (req, res) => {
+  try {
+    const { id } = req.params; // ← Changed from projectId to id
+    const { action, target, type, metadata } = req.body;
+    const userId = req.user.id;
+
+    console.log('📝 Logging activity for team project:', id);
+
+    // Verify user is a member of the project
+    const { data: membership, error: memberError } = await supabase
+      .from('project_members')
+      .select('id')
+      .eq('project_id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (memberError || !membership) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not a member of this project'
+      });
+    }
+
+    // Log activity
+    const { data: activity, error: activityError } = await supabase
+      .from('user_activity')
+      .insert({
+        user_id: userId,
+        project_id: id,
+        activity_type: type,
+        activity_data: {
+          action,
+          target,
+          metadata: metadata || {}
+        }
+      })
+      .select()
+      .single();
+
+    if (activityError) {
+      console.error('Error logging activity:', activityError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to log activity'
+      });
+    }
+
+    console.log('✅ Activity logged successfully:', activity.id);
+
+    res.json({
+      success: true,
+      data: { activity },
+      message: 'Activity logged successfully'
+    });
+
+  } catch (error) {
+    console.error('💥 Log activity error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to log activity'
+    });
+  }
 };
 
 module.exports = {
@@ -806,5 +930,7 @@ module.exports = {
   getProjectById,
   getUserProjects,
   updateProject,
-  deleteProject
+  deleteProject,
+  getRecentActivity,
+  logActivity
 };

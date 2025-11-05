@@ -1343,13 +1343,27 @@ const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
 
               {result && (
                 <button
-                  onClick={() => {
-                    if (result.projectJoined) {
-                      // Navigate to project dashboard
-                      navigate(`/projects/${projectId}`);
-                    } else {
-                      onClose();
-                    }
+                  onClick={async () => {  // ← ADD async here
+    if (result.projectJoined) {
+        // LOG ACTIVITY
+        try {
+            await projectService.logActivity(projectId, {
+                action: 'joined project',
+                target: '',
+                type: 'member_joined',
+                metadata: { 
+                    challengeScore: result.score,
+                    challengePassed: result.passed
+                }
+            });
+        } catch (activityError) {
+            console.error('Failed to log activity:', activityError);
+        }
+        
+        navigate(`/projects/${projectId}`);
+    } else {
+        onClose();
+    }
                   }}
                   style={{ ...styles.button, ...styles.primaryButton }}
                   onMouseEnter={(e) => {

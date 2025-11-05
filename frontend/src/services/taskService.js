@@ -1,5 +1,7 @@
 // frontend/src/services/taskService.js
 import api from './api';
+import { projectService } from './projectService'; // ← ADD THIS IMPORT
+
 
 export const taskService = {
   // Get all tasks for a project

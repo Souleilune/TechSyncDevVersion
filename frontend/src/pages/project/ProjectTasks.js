@@ -504,29 +504,46 @@ function ProjectTasks() {
   };
 
   const createTask = async () => {
-    try {
-      const taskData = {
-        title: taskForm.title.trim(),
-        description: taskForm.description.trim() || undefined,
-        task_type: taskForm.task_type || 'development',
-        priority: taskForm.priority || 'medium',
-        status: taskForm.status || 'todo',
-        assigned_to: taskForm.assigned_to && taskForm.assigned_to.trim() ? taskForm.assigned_to.trim() : undefined,
-        estimated_hours: taskForm.estimated_hours && taskForm.estimated_hours.trim() ? parseInt(taskForm.estimated_hours) : undefined,
-        due_date: taskForm.due_date && taskForm.due_date.trim() ? new Date(taskForm.due_date).toISOString() : undefined
-      };
+  try {
+    const taskData = {
+      title: taskForm.title.trim(),
+      description: taskForm.description.trim() || undefined,
+      task_type: taskForm.task_type || 'development',
+      priority: taskForm.priority || 'medium',
+      status: taskForm.status || 'todo',
+      assigned_to: taskForm.assigned_to && taskForm.assigned_to.trim() ? taskForm.assigned_to.trim() : undefined,
+      estimated_hours: taskForm.estimated_hours && taskForm.estimated_hours.trim() ? parseInt(taskForm.estimated_hours) : undefined,
+      due_date: taskForm.due_date && taskForm.due_date.trim() ? new Date(taskForm.due_date).toISOString() : undefined
+    };
 
-      const response = await taskService.createTask(projectId, taskData);
-      setTasks(prevTasks => [response.data.task, ...prevTasks]);
-      setShowCreateModal(false);
-      resetForm();
-      setError(null);
-      showSuccessMessage('Task created successfully');
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to create task';
-      setError(errorMessage);
+    const response = await taskService.createTask(projectId, taskData);
+    setTasks(prevTasks => [response.data.task, ...prevTasks]);
+    
+    // ✅ LOG ACTIVITY FOR TASK CREATION
+    try {
+      await projectService.logActivity(projectId, {
+        action: 'created task',
+        target: response.data.task.title,
+        type: 'task_created',
+        metadata: { 
+          taskId: response.data.task.id,
+          priority: response.data.task.priority
+        }
+      });
+      console.log('✅ Activity logged: task created');
+    } catch (activityError) {
+      console.error('Failed to log activity:', activityError);
     }
-  };
+    
+    setShowCreateModal(false);
+    resetForm();
+    setError(null);
+    showSuccessMessage('Task created successfully');
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to create task';
+    setError(errorMessage);
+  }
+};
 
   const editTask = (task) => {
     setEditingTask(task);
@@ -548,13 +565,31 @@ function ProjectTasks() {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
 
     try {
-      await taskService.deleteTask(projectId, taskId);
-      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-      showSuccessMessage('Task deleted successfully');
+        // Get task title before deletion
+        const taskToDelete = tasks.find(t => t.id === taskId);
+        const taskTitle = taskToDelete?.title || 'Unknown Task';
+        
+        await taskService.deleteTask(projectId, taskId);
+        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+        
+        // ⭐ LOG ACTIVITY FOR TASK DELETION ⭐
+        try {
+            await projectService.logActivity(projectId, {
+                action: 'deleted task',
+                target: taskTitle,
+                type: 'project_updated',
+                metadata: { taskId: taskId }
+            });
+            console.log('✅ Activity logged for task deletion');
+        } catch (activityError) {
+            console.error('Failed to log activity:', activityError);
+        }
+        
+        showSuccessMessage('Task deleted successfully');
     } catch (error) {
-      setError('Failed to delete task');
+        setError('Failed to delete task');
     }
-  };
+};
 
   const viewTaskDetail = (taskId) => {
     navigate(`/project/${projectId}/tasks/${taskId}`);
@@ -625,10 +660,26 @@ function ProjectTasks() {
         
         if (response.success && response.data?.task) {
           setTasks(prevTasks => 
-            prevTasks.map(task => 
-              task.id === editingTask.id ? { ...task, ...response.data.task } : task
-            )
+              prevTasks.map(task => 
+                  task.id === editingTask.id ? { ...task, ...response.data.task } : task
+              )
           );
+          
+          // ⭐ LOG ACTIVITY FOR TASK UPDATE ⭐
+          try {
+              await projectService.logActivity(projectId, {
+                  action: 'updated task',
+                  target: response.data.task.title,
+                  type: 'project_updated',
+                  metadata: { 
+                      taskId: editingTask.id,
+                      updatedFields: Object.keys(taskData)
+                  }
+              });
+              console.log('✅ Activity logged for task update');
+          } catch (activityError) {
+              console.error('Failed to log activity:', activityError);
+          }
           
           showSuccessMessage('Task updated successfully');
           setShowCreateModal(false);

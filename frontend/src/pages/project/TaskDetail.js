@@ -70,24 +70,52 @@ const TaskDetail = () => {
     };
 
     const handleStatusChange = async (newStatus) => {
-        try {
-            console.log('🔄 Updating task status to:', newStatus);
+    try {
+        console.log('🔄 Updating task status to:', newStatus);
+        
+        const response = await taskService.updateTask(projectId, taskId, {
+            status: newStatus
+        });
+
+        if (response && response.data && response.data.task) {
+            setTask(response.data.task);
+            console.log('✅ Task status updated successfully');
             
-            const response = await taskService.updateTask(projectId, taskId, {
-                status: newStatus
-            });
-
-            if (response && response.data && response.data.task) {
-                setTask(response.data.task);
-                console.log('✅ Task status updated successfully');
+            // ✅ LOG ACTIVITY FOR STATUS CHANGES
+            try {
+                let activityType = '';
+                let actionText = '';
+                
+                if (newStatus === 'completed') {
+                    activityType = 'task_completed';
+                    actionText = 'completed task';
+                } else if (newStatus === 'in_progress') {
+                    activityType = 'task_started';
+                    actionText = 'started task';
+                }
+                
+                if (activityType) {
+                    await projectService.logActivity(projectId, {
+                        action: actionText,
+                        target: task.title,
+                        type: activityType,
+                        metadata: { 
+                            taskId: task.id,
+                            newStatus: newStatus
+                        }
+                    });
+                    console.log(`✅ Activity logged: ${actionText}`);
+                }
+            } catch (activityError) {
+                console.error('Failed to log activity:', activityError);
             }
-
-        } catch (error) {
-            console.error('💥 Error updating status:', error);
-            alert(`Failed to update status: ${error.response?.data?.message || error.message}`);
         }
-    };
 
+    } catch (error) {
+        console.error('💥 Error updating status:', error);
+        alert(`Failed to update status: ${error.response?.data?.message || error.message}`);
+    }
+};
     const formatDate = (dateString) => {
         if (!dateString) return 'Not set';
         return new Date(dateString).toLocaleDateString();
