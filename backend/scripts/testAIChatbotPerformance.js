@@ -1,4 +1,4 @@
-// backend/scripts/testAIChatbotPerformance.js
+// backend/scripts/ 
 // Comprehensive AI Chatbot Performance Testing Script
 // Run: node scripts/testAIChatbotPerformance.js
 

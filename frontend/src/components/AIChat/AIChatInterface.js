@@ -1,5 +1,5 @@
-// frontend/src/components/AIChat/AIChatInterface.js - COMPLETE FIX
-// Replace your ENTIRE AIChatInterface.js with this version
+// frontend/src/components/AIChat/AIChatInterface.js - FIXED VERSION
+// This version has IMPROVED project detection that catches more variations
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -228,7 +228,7 @@ What would you like to work on today?`,
       estimated_duration: projectData.estimated_duration || 'medium',
       status: 'active',
       is_public: false,
-      tasks: Array.isArray(projectData.tasks) ? projectData.tasks : [] // ← CRITICAL FIX
+      tasks: Array.isArray(projectData.tasks) ? projectData.tasks : []
     };
 
     console.log('═══════════════════════════════════════════════');
@@ -466,7 +466,7 @@ What would you like to work on today?`,
       programming_languages: technologies,
       topics: ['Web Development'],
       estimated_duration: 'medium',
-      tasks: tasks // ← CRITICAL: Make sure tasks are attached
+      tasks: tasks
     };
 
     console.log('═══════════════════════════════════════════════');
@@ -514,42 +514,102 @@ What would you like to work on today?`,
       );
 
       if (response.success) {
-  // FIXED: More strict project suggestion detection
-  const isValidProjectSuggestion = (message) => {
-    // Must have bold title at the start (like **Project Name**)
-    const hasBoldTitle = /^\*\*[^*]+\*\*/.test(message.trim());
-    
-    // Count how many required sections are present
-    const hasKeyFeatures = message.includes('Key Features:');
-    const hasTechnologies = message.includes('Technologies:');
-    const hasDifficulty = message.includes('Difficulty:');
-    const hasTimeEstimate = message.includes('Time Estimate:');
-    const hasWeeklyBreakdown = message.includes('Weekly Task Breakdown:') || message.match(/Week\s+\d+:/i);
-    
-    const requiredSections = [
-      hasKeyFeatures,
-      hasTechnologies,
-      hasDifficulty,
-      hasTimeEstimate,
-      hasWeeklyBreakdown
-    ];
-    
-    const sectionCount = requiredSections.filter(Boolean).length;
-    
-    // Strict criteria: Must have bold title AND at least 3 of the 5 required sections
-    return hasBoldTitle && sectionCount >= 3;
-  };
+        // 🔥 IMPROVED: More flexible project suggestion detection
+        const isValidProjectSuggestion = (message) => {
+          const content = message.trim();
+          
+          // Check 1: Has bold title (most project suggestions start with this)
+          const hasBoldTitle = /\*\*[^*]+\*\*/.test(content);
+          
+          // Check 2: Has weekly task breakdown pattern (Week 1:, Week 2:, etc.)
+          const hasWeeklyTasks = /Week\s+\d+[\s:;-]/i.test(content);
+          
+          // Check 3: Count project-related keywords
+          const projectKeywords = [
+            'Key Features:',
+            'Technologies:',
+            'Difficulty:',
+            'Time Estimate:',
+            'Weekly Task Breakdown:',
+            'Project Setup',
+            'Implementation',
+            'Testing'
+          ];
+          
+          const keywordCount = projectKeywords.filter(keyword => 
+            content.includes(keyword)
+          ).length;
+          
+          // Check 4: Has technology/language mention
+          const hasTechMention = /Technologies?:\s*[^\n]+/i.test(content);
+          
+          // Check 5: Has difficulty level
+          const hasDifficulty = /Difficulty:\s*(Easy|Medium|Hard|Beginner|Intermediate|Advanced)/i.test(content);
+          
+          // Check 6: Length check - project suggestions are typically longer
+          const isLongEnough = content.length > 300;
+          
+          // Check 7: Has multiple bullet points (features list)
+          const bulletCount = (content.match(/^[•\-\*]\s/gm) || []).length;
+          const hasMultipleBullets = bulletCount >= 3;
+          
+          // NEW: Check 8: Has "project idea" phrase (catches conversational intros)
+          const hasProjectIdeaPhrase = /(?:project idea|detailed project|here'?s? (?:a|an|the) (?:detailed )?project)/i.test(content);
+          
+          // NEW: Check 9: Has project-suggestive phrases
+          const projectPhrases = [
+            'building a',
+            'create a',
+            'develop a',
+            'project for you',
+            'suggest',
+            'how about',
+            'budget tracker',
+            'todo app',
+            'weather app'
+          ];
+          const hasProjectPhrase = projectPhrases.some(phrase => 
+            content.toLowerCase().includes(phrase)
+          );
+          
+          // Flexible criteria: 
+          // Must have weekly tasks OR (bold title + at least 2 keywords + long enough)
+          // OR has conversational project intro with sufficient structure
+          const meetsFlexibleCriteria = (
+            hasWeeklyTasks || 
+            (hasBoldTitle && keywordCount >= 2 && isLongEnough) ||
+            (hasBoldTitle && hasTechMention && hasDifficulty && hasMultipleBullets) ||
+            (hasProjectIdeaPhrase && hasBoldTitle && isLongEnough) ||  // "Here's a project idea for you: **Title**"
+            (hasProjectPhrase && hasBoldTitle && keywordCount >= 2)     // "How about building a **Title**" with keywords
+          );
+          
+          console.log('🔍 Project Detection Debug:', {
+            hasBoldTitle,
+            hasWeeklyTasks,
+            keywordCount,
+            hasTechMention,
+            hasDifficulty,
+            isLongEnough,
+            bulletCount,
+            hasMultipleBullets,
+            hasProjectIdeaPhrase,
+            hasProjectPhrase,
+            meetsFlexibleCriteria
+          });
+          
+          return meetsFlexibleCriteria;
+        };
 
-  const aiMessage = {
-    id: Date.now() + 1,
-    role: 'assistant',
-    content: response.data.message,
-    timestamp: response.data.timestamp,
-    isProjectSuggestion: isValidProjectSuggestion(response.data.message)
-  };
-  
-  setMessages(prev => [...prev, aiMessage]);
-}
+        const aiMessage = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: response.data.message,
+          timestamp: response.data.timestamp,
+          isProjectSuggestion: isValidProjectSuggestion(response.data.message)
+        };
+        
+        setMessages(prev => [...prev, aiMessage]);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage = {
