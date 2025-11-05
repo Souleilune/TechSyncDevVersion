@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, Clock, TrendingUp, Code, Target, Calendar, Lock, Sparkles, User } from 'lucide-react';
+import api from '../services/api';
 
 const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
   const [isJoining, setIsJoining] = useState(false);
@@ -25,15 +26,22 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
         return;
       }
 
-      // Otherwise fetch from API
+      // Also check if project has users property (from SQL join)
+      if (project.users?.username || project.users?.email) {
+        setOwnerInfo(project.users);
+        return;
+      }
+
+      // Otherwise fetch from API using the correct endpoint
       if (ownerId) {
         setLoadingOwner(true);
         try {
-          // You can use your API service here
-          const response = await fetch(`/api/users/${ownerId}`);
-          if (response.ok) {
-            const data = await response.json();
-            setOwnerInfo(data.user || data);
+          console.log('Fetching owner info for ID:', ownerId);
+          const response = await api.get(`/users/${ownerId}`);
+          
+          if (response.data.success) {
+            setOwnerInfo(response.data.user);
+            console.log('✅ Owner info fetched:', response.data.user);
           }
         } catch (error) {
           console.error('Error fetching owner info:', error);
@@ -54,6 +62,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
   console.log('ProjectDetailModal - Project data:', project);
   console.log('ProjectDetailModal - All project keys:', Object.keys(project));
   console.log('ProjectDetailModal - Owner data:', project?.owner);
+  console.log('ProjectDetailModal - Users data:', project?.users);
   console.log('ProjectDetailModal - Owner ID:', project?.owner_id);
   console.log('ProjectDetailModal - Nested project:', project?.project);
   console.log('ProjectDetailModal - Nested owner_id:', project?.project?.owner_id);
@@ -187,14 +196,24 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
                       <span style={{ color: '#9ca3af', fontSize: '13px' }}>Loading...</span>
                     ) : ownerInfo?.username ? (
                       ownerInfo.username
+                    ) : ownerInfo?.full_name ? (
+                      ownerInfo.full_name
                     ) : ownerInfo?.email ? (
-                      ownerInfo.email
+                      ownerInfo.email.split('@')[0]
                     ) : project.owner?.username ? (
                       project.owner.username
+                    ) : project.owner?.full_name ? (
+                      project.owner.full_name
                     ) : project.owner?.email ? (
-                      project.owner.email
+                      project.owner.email.split('@')[0]
+                    ) : project.users?.username ? (
+                      project.users.username
+                    ) : project.users?.full_name ? (
+                      project.users.full_name
+                    ) : project.users?.email ? (
+                      project.users.email.split('@')[0]
                     ) : ownerInfo?.id ? (
-                      `ID: ${ownerInfo.id.slice(0, 8)}...`
+                      `User ${ownerInfo.id.slice(0, 8)}...`
                     ) : (
                       'Owner Info Unavailable'
                     )}

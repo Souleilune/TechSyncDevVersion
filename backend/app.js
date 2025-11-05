@@ -30,6 +30,7 @@ const soloProjectRoutes = require('./routes/soloProjectRoutes');
 const awardsRoutes = require('./routes/awards');
 const userProfileUpdateRoutes = require('./routes/userProfileUpdate');
 const collaborativeProjectCompletionRoutes = require('./routes/collaborativeProjectCompletion');
+const usersRoutes = require('./routes/users');
 
 // ✅ NEW: Import recommendations routes
 const recommendationsRoutes = require('./routes/recommendations');
@@ -141,6 +142,7 @@ const supabase = require('./config/supabase');
 // 1. Independent routes first
 app.use('/api/auth', authRoutes);
 app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/suggestions', suggestionsRoutes);
 app.use('/api/skill-matching', skillMatchingRoutes);
 app.use('/api/challenges', challengeRoutes);
