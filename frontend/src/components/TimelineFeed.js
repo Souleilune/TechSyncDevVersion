@@ -146,24 +146,41 @@ const TimelineFeed = () => {
 
   const handleAddComment = async (postId, parentCommentId = null) => {
     const content = commentInputs[postId]?.trim();
-    if (!content) return;
+    if (!content) {
+      console.log('❌ No content to submit');
+      return;
+    }
+
+    console.log('📤 Submitting comment:', { postId, content, parentCommentId });
 
     try {
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.error('❌ No auth token found');
+        alert('Please log in to comment');
+        return;
+      }
+
+      console.log('🔄 Making API request to:', `${API_URL}/timeline/posts/${postId}/comments`);
+      
       const response = await axios.post(
         `${API_URL}/timeline/posts/${postId}/comments`,
         { content, parentCommentId },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
 
+      console.log('✅ Comment API response:', response.data);
+
       if (response.data.success) {
-        // Clear input
+        // Clear input immediately
         setCommentInputs(prev => ({ ...prev, [postId]: '' }));
         setReplyTo(prev => ({ ...prev, [postId]: null }));
-        
-        // Refresh comments
-        toggleComments(postId);
-        toggleComments(postId);
         
         // Update comment count
         setPosts(prevPosts => prevPosts.map(post => {
@@ -178,9 +195,37 @@ const TimelineFeed = () => {
           }
           return post;
         }));
+
+        // Refresh comments to show the new one
+        try {
+          const commentsResponse = await axios.get(
+            `${API_URL}/timeline/posts/${postId}/comments`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          if (commentsResponse.data.success) {
+            setExpandedComments(prev => ({
+              ...prev,
+              [postId]: commentsResponse.data.data.comments
+            }));
+          }
+        } catch (refreshErr) {
+          console.error('Error refreshing comments:', refreshErr);
+        }
+
+        console.log('✅ Comment submitted successfully');
       }
     } catch (err) {
-      console.error('Error adding comment:', err);
+      console.error('❌ Error adding comment:', err);
+      console.error('Error details:', err.response?.data || err.message);
+      
+      if (err.response?.status === 401) {
+        alert('Session expired. Please log in again.');
+      } else if (err.response?.status === 404) {
+        alert('Post not found.');
+      } else {
+        alert('Failed to post comment. Please try again.');
+      }
     }
   };
 
@@ -529,7 +574,7 @@ const TimelineFeed = () => {
                 placeholder={replyTo[post.id] ? "Write a reply..." : "Write a comment..."}
                 value={commentInputs[post.id] || ''}
                 onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
-                onKeyPress={(e) => {
+                onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleAddComment(post.id, replyTo[post.id]);
