@@ -3,8 +3,10 @@ const supabase = require('../config/supabase');
 const { validateUUID, sanitizeInput } = require('../utils/validation');
 
 class CommentsController {
-    // Get comments for a task
-    async getTaskComments(req, res) {
+    constructor() {
+        this.createCommentNotifications = this.createCommentNotifications.bind(this);
+    }
+    getTaskComments = async (req, res) => {
     try {
         const { taskId } = req.params;
         const { page = 1, limit = 20 } = req.query;
@@ -110,7 +112,7 @@ class CommentsController {
 }
 
     // Get replies to a comment
-    async getCommentReplies(req, res) {
+    getCommentReplies = async (req, res) => {
         try {
             const { commentId } = req.params;
             const userId = req.user.id;
@@ -167,7 +169,7 @@ class CommentsController {
     }
 
     // Create a new comment
-    async createComment(req, res) {
+    createComment = async (req, res) => {
         try {
             const { taskId } = req.params;
             const { content, parentCommentId, mentions = [] } = req.body;
@@ -348,7 +350,7 @@ res.status(201).json({ comment });
     }
 
     // Update a comment
-    async updateComment(req, res) {
+    updateComment = async (req, res) => { 
         try {
             const { commentId } = req.params;
             const { content, mentions = [] } = req.body;
@@ -423,7 +425,7 @@ res.status(201).json({ comment });
     }
 
     // Delete a comment
-    async deleteComment(req, res) {
+     deleteComment = async (req, res) => {
         try {
             const { commentId } = req.params;
             const userId = req.user.id;
