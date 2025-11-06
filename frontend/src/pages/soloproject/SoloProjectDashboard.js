@@ -7,6 +7,7 @@ import { taskService } from '../../services/taskService';
 import { BarChart3, Target, Clock, TrendingUp, Plus, StickyNote, FileText, Award, Trophy, RefreshCw, PanelLeft } from 'lucide-react';
 import AwardsDisplay from '../../components/AwardsDisplay';
 import TimelinePublisher from '../../components/TimelinePublisher';
+import TimelinePublishingService from '../../services/timelinePublishingService';
 
 // Background symbols component - WITH FLOATING ANIMATIONS
 const BackgroundSymbols = () => (
@@ -189,6 +190,8 @@ function SoloProjectDashboard() {
   const [error, setError] = useState('');
   const [showAwardNotification, setShowAwardNotification] = useState(false);
   const [newAward, setNewAward] = useState(null);
+  const [timelineRefreshTrigger, setTimelineRefreshTrigger] = useState(0);
+  const [previousCompletionRate, setPreviousCompletionRate] = useState(0);
 
   // NEW STATE: Track sidebar collapsed state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -327,10 +330,64 @@ function SoloProjectDashboard() {
 
   // Check awards when completion rate changes
   useEffect(() => {
-    if (projectStats?.completionRate > 0) {
-      checkForAwards();
+  const checkForAutoPublish = async () => {
+    // Only trigger when completion CHANGES from <100% to 100%
+    if (previousCompletionRate < 100 && projectStats.completionRate === 100) {
+      console.log('🎉 Project just reached 100%! Starting auto-publish check...');
+      
+      // Poll every 2 seconds, up to 5 times (10 seconds total)
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      const pollForPublish = async () => {
+        attempts++;
+        console.log(`🔄 Attempt ${attempts}/${maxAttempts}: Checking timeline status...`);
+        
+        try {
+          const response = await TimelinePublishingService.getTimelineStatus(projectId);
+          
+          console.log('📊 Timeline status response:', response.data);
+          
+          if (response.data.isPublished) {
+            console.log('✅ Auto-publish detected! Refreshing timeline widget...');
+            setTimelineRefreshTrigger(prev => prev + 1);
+            return true; // Stop polling
+          } else {
+            console.log(`⏳ Not published yet (attempt ${attempts}/${maxAttempts})`);
+            
+            // Continue polling if we haven't reached max attempts
+            if (attempts < maxAttempts) {
+              setTimeout(pollForPublish, 2000); // Check again in 2 seconds
+            } else {
+              console.log('❌ Max attempts reached. Timeline post may not have been created.');
+              console.log('💡 Try clicking the "Publish to Timeline" button manually.');
+            }
+            return false;
+          }
+        } catch (error) {
+          console.error(`❌ Error on attempt ${attempts}:`, error);
+          
+          // Continue polling on error if we haven't reached max attempts
+          if (attempts < maxAttempts) {
+            setTimeout(pollForPublish, 2000);
+          }
+          return false;
+        }
+      };
+      
+      // Start polling after initial 2 second delay
+      setTimeout(pollForPublish, 2000);
     }
-  }, [projectStats?.completionRate]);
+    
+    // Always update previous completion rate
+    setPreviousCompletionRate(projectStats.completionRate);
+  };
+
+  if (projectStats.completionRate !== undefined) {
+    checkForAutoPublish();
+  }
+}, [projectStats.completionRate, projectId, previousCompletionRate]);
+
 
   // Auto-refresh dashboard every 30 seconds
   useEffect(() => {
@@ -939,6 +996,7 @@ function SoloProjectDashboard() {
   projectId={project.id}
   projectTitle={project.title}
   projectDescription={project.description}
+  refreshTrigger={timelineRefreshTrigger}
 />
 
         {/* Analytics Cards */}

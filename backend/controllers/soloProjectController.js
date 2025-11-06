@@ -1522,6 +1522,7 @@ const publishToTimeline = async (req, res) => {
 
     console.log('📤 Publishing project to timeline:', projectId);
 
+    // Verify solo project access
     const accessCheck = await verifySoloProjectAccess(projectId, userId);
     if (!accessCheck.success) {
       return res.status(accessCheck.statusCode || 404).json({
@@ -1530,6 +1531,7 @@ const publishToTimeline = async (req, res) => {
       });
     }
 
+    // Check if already published
     const { data: existingPost } = await supabase
       .from('timeline_posts')
       .select('id')
@@ -1544,33 +1546,36 @@ const publishToTimeline = async (req, res) => {
       });
     }
 
-    const { data: project } = await supabase
-      .from('projects')
-      .select('title, description')
-      .eq('id', projectId)
-      .single();
+    // ✅ FIX: Use the helper function to create timeline post with proper completion data
+    const { createTimelinePostFromProject } = require('../utils/timelinePostHelper');
+    const timelinePost = await createTimelinePostFromProject(projectId, userId, 'solo');
 
-    const { data: timelinePost, error: postError } = await supabase
-      .from('timeline_posts')
-      .insert({
-        project_id: projectId,
-        user_id: userId,
-        post_type: 'solo_completion',
-        title: `🎉 Completed: ${project.title}`,
-        description: custom_description || project.description,
-        project_title: project.title,
-        project_type: 'solo',
-        visibility: 'public'
-      })
-      .select()
-      .single();
-
-    if (postError) {
-      console.error('Error creating timeline post:', postError);
+    if (!timelinePost) {
+      console.error('Failed to create timeline post');
       return res.status(500).json({
         success: false,
         message: 'Failed to publish to timeline'
       });
+    }
+
+    // Update description if custom description provided
+    if (custom_description) {
+      const { data: updatedPost, error: updateError } = await supabase
+        .from('timeline_posts')
+        .update({ description: custom_description })
+        .eq('id', timelinePost.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.warn('Could not update custom description:', updateError);
+      } else {
+        return res.status(201).json({
+          success: true,
+          data: { timelinePost: updatedPost },
+          message: 'Project published to timeline successfully'
+        });
+      }
     }
 
     res.status(201).json({

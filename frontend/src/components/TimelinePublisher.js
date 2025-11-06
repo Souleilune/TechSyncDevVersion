@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import TimelinePublishingService from '../services/timelinePublishingService';
 
-const TimelinePublisher = ({ projectId, projectTitle, projectDescription }) => {
+const TimelinePublisher = ({ projectId, projectTitle, projectDescription, refreshTrigger = 0 }) => {
   const [isPublished, setIsPublished] = useState(false);
   const [timelinePost, setTimelinePost] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +38,7 @@ const TimelinePublisher = ({ projectId, projectTitle, projectDescription }) => {
   // Fetch timeline status on mount
   useEffect(() => {
     fetchTimelineStatus();
-  }, [projectId]);
+  }, [projectId, refreshTrigger]);
 
   const fetchTimelineStatus = async () => {
     try {

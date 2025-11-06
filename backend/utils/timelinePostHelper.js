@@ -1,4 +1,6 @@
 // backend/utils/timelinePostHelper.js
+// FIXED VERSION - Queries correct table based on project type
+
 const supabase = require('../config/supabase');
 
 /**
@@ -59,17 +61,44 @@ const createTimelinePostFromProject = async (projectId, userId, projectType = 'g
       teamSize = (count || 0) + 1; // +1 for owner
     }
 
-    // Get task completion stats
-    const { data: tasks } = await supabase
-      .from('project_tasks')
-      .select('id, status')
-      .eq('project_id', projectId);
+    // ✅ FIX: Query the correct table based on project type
+    let totalTasks = 0;
+    let completedTasks = 0;
 
-    const totalTasks = tasks?.length || 0;
-    const completedTasks = tasks?.filter(t => t.status === 'completed').length || 0;
+    if (projectType === 'solo' || project.maximum_members === 1) {
+      // For SOLO projects, query solo_project_goals table
+      console.log('📊 Querying solo_project_goals for task completion...');
+      const { data: goals } = await supabase
+        .from('solo_project_goals')
+        .select('id, status')
+        .eq('project_id', projectId)
+        .eq('user_id', userId);  // Solo projects need user_id filter
+
+      totalTasks = goals?.length || 0;
+      completedTasks = goals?.filter(g => g.status === 'completed').length || 0;
+      
+      console.log(`   Total goals/tasks: ${totalTasks}`);
+      console.log(`   Completed: ${completedTasks}`);
+    } else {
+      // For GROUP projects, query project_tasks table
+      console.log('📊 Querying project_tasks for task completion...');
+      const { data: tasks } = await supabase
+        .from('project_tasks')
+        .select('id, status')
+        .eq('project_id', projectId);
+
+      totalTasks = tasks?.length || 0;
+      completedTasks = tasks?.filter(t => t.status === 'completed').length || 0;
+      
+      console.log(`   Total tasks: ${totalTasks}`);
+      console.log(`   Completed: ${completedTasks}`);
+    }
+
     const completionPercentage = totalTasks > 0 
       ? ((completedTasks / totalTasks) * 100).toFixed(2) 
       : 0;
+
+    console.log(`   ✅ Completion: ${completionPercentage}%`);
 
     // Determine post type based on project type
     const postType = projectType === 'solo' ? 'solo_completion' : 'group_completion';
@@ -102,6 +131,7 @@ const createTimelinePostFromProject = async (projectId, userId, projectType = 'g
     }
 
     console.log('✅ Timeline post created successfully:', post.id);
+    console.log(`   Completion: ${completionPercentage}% (${completedTasks}/${totalTasks} tasks)`);
     return post;
 
   } catch (error) {
