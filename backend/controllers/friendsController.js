@@ -201,6 +201,20 @@ const getFriendProfile = async (req, res) => {
       });
     }
 
+    // Fetch user's basic info
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, username, full_name, avatar_url, bio, github_username, years_experience, created_at')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !userData) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
     // Fetch user's awards
     const { data: awards, error: awardsError } = await supabase
       .from('user_awards')
@@ -215,87 +229,46 @@ const getFriendProfile = async (req, res) => {
       console.error('Error fetching awards:', awardsError);
     }
 
-    // Fetch user's completed projects (for achievements)
-    const { data: projects, error: projectsError } = await supabase
-      .from('project_members')
-      .select(`
-        project:project_id (
-          id,
-          title,
-          status,
-          progress_percentage,
-          created_at,
-          updated_at
-        )
-      `)
-      .eq('user_id', userId)
-      .in('project.status', ['completed', 'active']);
+    // Format awards - map database columns to frontend expected fields
+    const formattedAwards = awards?.map(award => ({
+      id: award.id,
+      title: award.award_title,             // Map award_title to title
+      description: award.award_description,  // Map award_description to description
+      award_type: award.award_type,
+      earned_at: award.earned_at,
+      project_title: award.projects?.title,
+      icon: award.award_icon || (award.award_type === 'team_achievement' ? 'trophy' : 
+            award.award_type === 'team_leader' ? 'crown' : 
+            award.award_type === 'project_completion' ? 'trophy' : null)
+    })) || [];
 
-    if (projectsError) {
-      console.error('Error fetching projects:', projectsError);
-    }
+    // Fetch user's project stats
+    const { data: completedProjects } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('owner_id', userId)
+      .eq('status', 'completed');
 
-    // Calculate achievements
+    const { data: activeProjects } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('owner_id', userId)
+      .in('status', ['in_progress', 'recruiting']);
+
+    // Simple achievements (can be expanded later)
     const achievements = [];
-    const completedProjects = projects?.filter(p => p.project?.status === 'completed') || [];
-    const activeProjects = projects?.filter(p => p.project?.status === 'active') || [];
-
-    // Add project completion achievements
-    if (completedProjects.length >= 1) {
-      const firstProject = completedProjects.sort((a, b) => 
-        new Date(a.project.updated_at) - new Date(b.project.updated_at)
-      )[0];
-      
+    if (completedProjects && completedProjects.length > 0) {
       achievements.push({
-        icon: '🏆',
-        title: 'Project Master',
-        description: `Completed a solo project with 100% progress`,
-        metadata: {
-          project: firstProject.project.title,
-          completion: '100%'
-        },
-        earned_at: firstProject.project.updated_at
-      });
-    }
-
-    if (completedProjects.length >= 5) {
-      achievements.push({
-        icon: '⭐',
-        title: 'Veteran Developer',
-        description: 'Completed 5 projects',
-        metadata: {
-          completed: completedProjects.length
-        }
-      });
-    }
-
-    if (completedProjects.length >= 10) {
-      achievements.push({
-        icon: '💎',
-        title: 'Master Builder',
-        description: 'Completed 10 projects',
-        metadata: {
-          completed: completedProjects.length
-        }
-      });
-    }
-
-    // Add collaboration achievements
-    if (activeProjects.length >= 3) {
-      achievements.push({
-        icon: '🤝',
-        title: 'Team Player',
-        description: 'Active in 3 or more projects',
-        metadata: {
-          active_projects: activeProjects.length
-        }
+        title: 'Project Completer',
+        description: `Completed ${completedProjects.length} project${completedProjects.length !== 1 ? 's' : ''}`
       });
     }
 
     res.json({
       success: true,
       data: {
-        awards: awards || [],
+        user: userData,
+        awards: formattedAwards,
         achievements,
         stats: {
           total_awards: awards?.length || 0,
@@ -307,6 +280,99 @@ const getFriendProfile = async (req, res) => {
 
   } catch (error) {
     console.error('💥 Get friend profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// NEW: Get any user's public profile (for timeline, etc.)
+const getPublicProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log('🌍 Fetching public profile for user:', userId);
+
+    // Fetch user's basic info
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, username, full_name, avatar_url, bio, years_experience, created_at')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !userData) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Fetch user's awards
+    const { data: awards, error: awardsError } = await supabase
+      .from('user_awards')
+      .select(`
+        *,
+        projects(id, title)
+      `)
+      .eq('user_id', userId)
+      .order('earned_at', { ascending: false });
+
+    if (awardsError) {
+      console.error('Error fetching awards:', awardsError);
+    }
+
+    // Format awards - map database columns to frontend expected fields
+    const formattedAwards = awards?.map(award => ({
+      id: award.id,
+      title: award.award_title,             // Map award_title to title
+      description: award.award_description,  // Map award_description to description
+      award_type: award.award_type,
+      earned_at: award.earned_at,
+      project_title: award.projects?.title,
+      icon: award.award_icon || (award.award_type === 'team_achievement' ? 'trophy' : 
+            award.award_type === 'team_leader' ? 'crown' : 
+            award.award_type === 'project_completion' ? 'trophy' : null)
+    })) || [];
+
+    // Fetch user's project stats
+    const { data: completedProjects } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('owner_id', userId)
+      .eq('status', 'completed');
+
+    const { data: activeProjects } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('owner_id', userId)
+      .in('status', ['in_progress', 'recruiting']);
+
+    // Simple achievements (can be expanded later)
+    const achievements = [];
+    if (completedProjects && completedProjects.length > 0) {
+      achievements.push({
+        title: 'Project Completer',
+        description: `Completed ${completedProjects.length} project${completedProjects.length !== 1 ? 's' : ''}`
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        user: userData,
+        awards: formattedAwards,
+        achievements,
+        stats: {
+          total_awards: awards?.length || 0,
+          completed_projects: completedProjects?.length || 0,
+          active_projects: activeProjects?.length || 0
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('💥 Get public profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -475,5 +541,6 @@ module.exports = {
   acceptFriendRequest,
   rejectFriendRequest,
   removeFriend,
-  getFriendProfile
+  getFriendProfile,
+  getPublicProfile  // NEW: Export the public profile function
 };

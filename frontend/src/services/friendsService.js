@@ -24,13 +24,24 @@ export const friendsService = {
     }
   },
 
-  // Get friend's profile with achievements and awards
+  // Get friend's profile with achievements and awards (requires friendship)
   getFriendProfile: async (userId) => {
     try {
       const response = await api.get(`/friends/${userId}/profile`);
       return response.data;
     } catch (error) {
       console.error('Get friend profile error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // NEW: Get any user's public profile (no friendship required)
+  getPublicProfile: async (userId) => {
+    try {
+      const response = await api.get(`/friends/${userId}/public-profile`);
+      return response.data;
+    } catch (error) {
+      console.error('Get public profile error:', error.response?.data || error.message);
       throw error;
     }
   },

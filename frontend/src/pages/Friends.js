@@ -1,7 +1,7 @@
 // frontend/src/pages/Friends.js - ALIGNED WITH DASHBOARD THEME AND ANIMATED BACKGROUND
 import React, { useState, useEffect } from 'react';
 import { friendsService } from '../services/friendsService';
-import { Users, UserPlus, UserCheck, UserX, User, Clock, Mail, Award, Trophy, PanelLeft } from 'lucide-react';
+import { Users, UserPlus, UserCheck, UserX, User, Clock, Mail, Award, Trophy, PanelLeft, Calendar } from 'lucide-react';
 
 // Background symbols component with animations - MATCHING DASHBOARD
 const BackgroundSymbols = () => (
@@ -1592,67 +1592,57 @@ function Friends() {
                   </div>
                 </div>
 
-                {/* Achievements Section */}
                 <div style={additionalStyles.achievementsSection}>
-                  <div style={additionalStyles.sectionHeader}>
-                    <Trophy size={20} style={{ color: '#FFD700' }} />
-                    <span>Achievements</span>
-                  </div>
-                  
-                  {loadingProfile ? (
-                    <div style={additionalStyles.loadingState}>
-                      Loading achievements...
-                    </div>
-                  ) : friendProfile?.achievements && friendProfile.achievements.length > 0 ? (
-                    <div>
-                      {friendProfile.achievements.map((achievement, index) => (
-                        <div 
-                          key={index} 
-                          style={additionalStyles.achievementCard}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
-                            e.currentTarget.style.transform = 'translateX(4px)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                            e.currentTarget.style.transform = 'translateX(0)';
-                          }}
-                        >
-                          <div style={additionalStyles.achievementHeader}>
-                            <div style={additionalStyles.achievementIcon}>
-                              {achievement.icon}
-                            </div>
-                            <div style={additionalStyles.achievementInfo}>
-                              <div style={additionalStyles.achievementTitle}>
-                                {achievement.title}
-                              </div>
-                              <div style={additionalStyles.achievementDescription}>
-                                {achievement.description}
-                              </div>
-                              {achievement.metadata && (
-                                <div style={additionalStyles.achievementMetadata}>
-                                  {achievement.metadata.project && `Project: ${achievement.metadata.project}`}
-                                  {achievement.metadata.completion && ` • Completion: ${achievement.metadata.completion}`}
-                                  {achievement.metadata.completed && `Completed: ${achievement.metadata.completed} projects`}
-                                  {achievement.metadata.active_projects && `Active in ${achievement.metadata.active_projects} projects`}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          {achievement.earned_at && (
-                            <div style={additionalStyles.awardDate}>
-                              📅 Earned on {new Date(achievement.earned_at).toLocaleDateString()}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={additionalStyles.emptyState}>
-                      No achievements yet
-                    </div>
-                  )}
-                </div>
+  <div style={additionalStyles.sectionHeader}>
+    <Trophy size={20} style={{ color: '#fbbf24' }} />
+    <span>Achievements</span>
+  </div>
+  
+  {loadingProfile ? (
+    <div style={additionalStyles.loadingState}>
+      Loading achievements...
+    </div>
+  ) : friendProfile?.achievements && friendProfile.achievements.length > 0 ? (
+    <div>
+      {friendProfile.achievements.map((achievement, index) => (
+        <div 
+          key={index} 
+          style={additionalStyles.achievementCard}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.transform = 'translateX(4px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.transform = 'translateX(0)';
+          }}
+        >
+          <div style={additionalStyles.achievementHeader}>
+            <div style={{
+              ...additionalStyles.achievementIcon,
+              backgroundColor: 'rgba(251, 191, 36, 0.15)',
+              border: '1px solid rgba(251, 191, 36, 0.3)'
+            }}>
+              <Trophy size={24} color="#fbbf24" />
+            </div>
+            <div style={additionalStyles.achievementInfo}>
+              <div style={additionalStyles.achievementTitle}>
+                {achievement.title}
+              </div>
+              <div style={additionalStyles.achievementDescription}>
+                {achievement.description}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div style={additionalStyles.emptyState}>
+      No achievements yet
+    </div>
+  )}
+</div>
 
                 {/* Awards Section */}
                 <div style={additionalStyles.achievementsSection}>
@@ -1681,46 +1671,39 @@ function Friends() {
                   ) : friendProfile?.awards && friendProfile.awards.length > 0 ? (
                     <div>
                       {friendProfile.awards.map((award) => (
-                        <div 
-                          key={award.id} 
-                          style={additionalStyles.awardCard}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.15))';
-                            e.currentTarget.style.transform = 'translateX(4px)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1))';
-                            e.currentTarget.style.transform = 'translateX(0)';
-                          }}
-                        >
-                          <div style={additionalStyles.awardHeader}>
-                            <div style={{
-                              ...additionalStyles.awardIconContainer,
-                              backgroundColor: `${award.award_color}20`,
-                              borderColor: `${award.award_color}60`
-                            }}>
-                              {award.award_icon}
-                            </div>
-                            <div style={additionalStyles.awardInfo}>
-                              <div style={additionalStyles.awardTitle}>
-                                {award.award_title}
-                              </div>
-                              <div style={additionalStyles.awardDescription}>
-                                {award.award_description}
-                              </div>
-                              {award.metadata && award.metadata.project_title && (
-                                <div style={additionalStyles.achievementMetadata}>
-                                  Project: {award.metadata.project_title}
-                                  {award.metadata.completion_percentage && ` • ${award.metadata.completion_percentage}% complete`}
-                                </div>
-                              )}
-                              <div style={additionalStyles.awardDate}>
-                                📅 Earned on {new Date(award.earned_at).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+  <div key={award.id} style={additionalStyles.awardCard}>
+    <div style={additionalStyles.awardHeader}>
+      <div style={{
+        ...additionalStyles.awardIconContainer,
+        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        borderColor: 'rgba(59, 130, 246, 0.4)'
+      }}>
+        {award.icon === 'trophy' && <Trophy size={24} color="#fbbf24" />}
+        {award.icon === 'crown' && <Award size={24} color="#f59e0b" />}
+        {!award.icon && <Award size={24} color="#60a5fa" />}
+      </div>
+      <div style={additionalStyles.awardInfo}>
+        <div style={additionalStyles.awardTitle}>
+          {award.icon === 'trophy' && <Trophy size={16} color="#fbbf24" style={{ marginRight: '6px' }} />}
+          {award.icon === 'crown' && <Award size={16} color="#f59e0b" style={{ marginRight: '6px' }} />}
+          {award.title?.replace(/🏆|👑|🌟|⚡|[\u{1F3C6}\u{1F451}\u{1F31F}\u{26A1}]/gu, '').trim()}
+        </div>
+        <div style={additionalStyles.awardDescription}>
+          {award.description}
+        </div>
+        {award.project_title && (
+          <div style={additionalStyles.achievementMetadata}>
+            Project: {award.project_title}
+          </div>
+        )}
+        <div style={additionalStyles.awardDate}>
+          <Calendar size={14} style={{ marginRight: '4px' }} />
+          Earned on {new Date(award.earned_at).toLocaleDateString()}
+        </div>
+      </div>
+    </div>
+  </div>
+))}
                     </div>
                   ) : (
                     <div style={additionalStyles.emptyState}>
