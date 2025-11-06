@@ -19,7 +19,7 @@ class CommentsController {
         // First, get the task and check if it exists
         const { data: task, error: taskError } = await supabase
             .from('project_tasks')
-            .select('id, project_id')
+            .select('id, project_id, title')
             .eq('id', taskId)
             .single();
 
@@ -210,7 +210,7 @@ class CommentsController {
             console.log('🔍 Checking task access...');
             const { data: task, error: taskError } = await supabase
                 .from('project_tasks')
-                .select('id, project_id')
+                .select('id, project_id, title')
                 .eq('id', taskId)
                 .single();
 
@@ -287,7 +287,7 @@ try {
 // ✅ LOG ACTIVITY FOR COMMENT
 try {
     let actionText = 'commented on';
-    let targetText = `"${task.title}"`;
+    let targetText = `tasks: "${task.title}"`;
     const metadata = {
         taskId: task.id,
         taskTitle: task.title,
