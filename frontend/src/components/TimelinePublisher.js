@@ -477,33 +477,8 @@ const TimelinePublisher = ({ projectId, projectTitle, projectDescription }) => {
               e.preventDefault();
               modalMode === 'publish' ? handlePublish() : handleUpdate();
             }}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  GitHub Repository (Optional)
-                </label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={formData.githubUrl}
-                  onChange={(e) => setFormData({ ...formData, githubUrl: e.target.value })}
-                  placeholder="https://github.com/username/repo"
-                />
-                <p style={styles.hint}>Link to your project's source code</p>
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  Live Demo URL (Optional)
-                </label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={formData.liveDemoUrl}
-                  onChange={(e) => setFormData({ ...formData, liveDemoUrl: e.target.value })}
-                  placeholder="https://your-project.com"
-                />
-                <p style={styles.hint}>Link to your deployed project</p>
-              </div>
+              
+              
 
               <div style={styles.formGroup}>
                 <label style={styles.label}>

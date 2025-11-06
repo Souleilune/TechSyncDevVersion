@@ -1511,7 +1511,7 @@ const getTimelinePost = async (req, res) => {
 const publishToTimeline = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { github_url, live_demo_url, custom_description } = req.body;
+    const { custom_description } = req.body;
     const userId = req.user.id;
 
     console.log('📤 Publishing project to timeline:', projectId);
@@ -1554,8 +1554,6 @@ const publishToTimeline = async (req, res) => {
         description: custom_description || project.description,
         project_title: project.title,
         project_type: 'solo',
-        github_url: github_url || null,
-        live_demo_url: live_demo_url || null,
         visibility: 'public'
       })
       .select()
@@ -1587,7 +1585,7 @@ const publishToTimeline = async (req, res) => {
 const updateTimelinePost = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { github_url, live_demo_url, description, visibility } = req.body;
+    const { description, visibility } = req.body;
     const userId = req.user.id;
 
     console.log('✏️ Updating timeline post for project:', projectId);
@@ -1604,7 +1602,7 @@ const updateTimelinePost = async (req, res) => {
       updated_at: new Date().toISOString()
     };
 
-    if (github_url !== undefined) updateData.github_url = github_url;
+    if (github_url !== undefined) updateData.github_repo_url = github_url;
     if (live_demo_url !== undefined) updateData.live_demo_url = live_demo_url;
     if (description !== undefined) updateData.description = description;
     if (visibility !== undefined) updateData.visibility = visibility;

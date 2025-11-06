@@ -862,11 +862,7 @@ function SoloProjectDashboard() {
       >
         <PanelLeft size={20} />
       </button>
-      <TimelinePublisher
-  projectId={project.id}
-  projectTitle={project.title}
-  projectDescription={project.description}
-/>
+     
 
       <div style={styles.container}>
         <BackgroundSymbols />
@@ -938,6 +934,12 @@ function SoloProjectDashboard() {
             </p>
           </div>
         </div>
+
+         <TimelinePublisher
+  projectId={project.id}
+  projectTitle={project.title}
+  projectDescription={project.description}
+/>
 
         {/* Analytics Cards */}
         <div style={styles.analyticsGrid}>
