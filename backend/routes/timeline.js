@@ -51,7 +51,7 @@ const commentContentValidation = [
     .isLength({ min: 1, max: 2000 })
     .withMessage('Comment content must be between 1 and 2000 characters'),
   body('parentCommentId')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .isUUID()
     .withMessage('Parent comment ID must be a valid UUID')
 ];
