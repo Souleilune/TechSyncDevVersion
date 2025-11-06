@@ -10,7 +10,8 @@ import NotificationDropdown from '../components/Notifications/NotificationDropdo
 import AIChatInterface from '../components/AIChat/AIChatInterface';
 import ProjectChallengeInterface from '../components/ProjectChallengeInterface'; // ADD THIS IMPORT
 import ProjectDetailModal from '../components/ProjectDetailModal';
-import { Plus, Bell, Rocket, Code, Users, BookOpen, HelpCircle, LockKeyhole, PanelLeft } from 'lucide-react';
+import TimelineFeed from '../components/TimelineFeed';
+import { Plus, Bell, Rocket, Code, Users, BookOpen, HelpCircle, LockKeyhole, PanelLeft, Sparkles } from 'lucide-react';
 
 const formatSkillsDescription = (user) => {
   if (!user) return 'Complete your profile to get personalized recommendations!';
@@ -2048,15 +2049,14 @@ useEffect(() => {
         <div style={styles.tabNavigation}>
           <div style={styles.tabHeader}>
             <button
-              style={{
-                ...styles.tabButton,
-                backgroundColor: activeTab === 'home' ? '#1a1d24' : 'transparent',
-                color: '#E8EDF9'
-              }}
-              onClick={() => setActiveTab('home')}
-            >
-              For You
-            </button>
+            style={{
+              ...styles.tabButton,
+              backgroundColor: activeTab === 'home' ? '#1a1d24' : 'transparent',
+            }}
+            onClick={() => setActiveTab('home')}
+          >
+            For You
+          </button>
             <button
               style={{
                 ...styles.tabButton,
@@ -2081,6 +2081,20 @@ useEffect(() => {
           </div>
 
           <div style={styles.tabContent}>
+            {activeTab === 'home' && (
+            <div>
+              <h3 style={styles.sectionTitle}>
+                <Sparkles size={24} style={{ color: '#3b82f6' }} />
+                For You Timeline
+              </h3>
+              <p style={styles.sectionDescription}>
+                See what your peers have accomplished! Completed projects from solo developers and teams.
+              </p>
+              
+              {/* ⬇️ ADD TIMELINE FEED COMPONENT */}
+              <TimelineFeed />
+            </div>
+          )}
             {/* RECOMMENDED PROJECTS TAB */}
             {activeTab === 'recommended' && (
               <div>

@@ -1,6 +1,8 @@
 // backend/controllers/soloProjectController.js - FIXED VERSION
 const supabase = require('../config/supabase');
 const awardsController = require('./awardsController');
+const { createTimelinePostFromProject } = require('../utils/timelinePostHelper');
+
 
 const checkAndAwardProgress = async (projectId, userId) => {
   try {
@@ -24,6 +26,13 @@ const checkAndAwardProgress = async (projectId, userId) => {
 
 const checkProjectCompletionInternal = async (projectId, userId) => {
   try {
+     await supabase
+      .from('projects')
+      .update({ status: 'completed' })
+      .eq('id', projectId);
+
+    // ⬇️ CREATE TIMELINE POST
+    await createTimelinePostFromProject(projectId, userId, 'solo');
     const { data: goals } = await supabase
       .from('solo_project_goals')
       .select('status, progress')

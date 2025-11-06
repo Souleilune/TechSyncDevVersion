@@ -372,6 +372,14 @@ const markProjectComplete = async (req, res) => {
     const { skip_validation } = req.body; // Optional: skip completion percentage check
 
     console.log('🎯 Marking project as complete:', projectId);
+    await supabase
+      .from('projects')
+      .update({ status: 'completed' })
+      .eq('id', projectId);
+
+    // ⬇️ CREATE TIMELINE POSTS FOR ALL TEAM MEMBERS
+    await createTimelinePostsForTeam(projectId);
+
 
     // Verify project exists and not already completed
     const { data: project, error: projectError } = await supabase
