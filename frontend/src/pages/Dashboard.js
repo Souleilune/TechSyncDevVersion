@@ -2050,12 +2050,22 @@ useEffect(() => {
             <button
               style={{
                 ...styles.tabButton,
+                backgroundColor: activeTab === 'home' ? '#1a1d24' : 'transparent',
+                color: '#E8EDF9'
+              }}
+              onClick={() => setActiveTab('home')}
+            >
+              For You
+            </button>
+            <button
+              style={{
+                ...styles.tabButton,
                 backgroundColor: activeTab === 'recommended' ? '#1a1d24' : 'transparent',
                 color: '#E8EDF9'
               }}
               onClick={() => setActiveTab('recommended')}
             >
-              For You
+              Group Project
             </button>
 
             <button
