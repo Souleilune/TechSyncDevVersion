@@ -807,6 +807,12 @@ const updateGoal = async (req, res) => {
 
     console.log('✅ Goal updated successfully:', goal.id);
 
+    // ✅ NEW: Check if project is now complete and award/publish if needed
+    if (updateData.status === 'completed') {
+      console.log('🎯 Goal marked as completed, checking for project completion...');
+      await checkAndAwardProgress(projectId, userId);
+    }
+
     res.json({
       success: true,
       data: { goal },
