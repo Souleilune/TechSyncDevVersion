@@ -6,7 +6,8 @@ import LoadingSpinner from '../UI/LoadingSpinner';
 const CommentReplies = ({ 
     parentCommentId, 
     taskId,
-    projectMembers, 
+    projectMembers,
+    projectOwner = null, // ✅ FIXED: Added projectOwner prop
     currentUser, 
     onCommentUpdated, 
     onCommentDeleted,
@@ -94,6 +95,7 @@ const CommentReplies = ({
                     key={reply.id}
                     comment={reply}
                     projectMembers={projectMembers}
+                    projectOwner={projectOwner} /* ✅ FIXED: Pass projectOwner to CommentItem */
                     currentUser={currentUser}
                     onCommentUpdated={handleReplyUpdated}
                     onCommentDeleted={handleReplyDeleted}
@@ -106,6 +108,7 @@ const CommentReplies = ({
                     taskId={taskId}
                     parentCommentId={parentCommentId}
                     projectMembers={projectMembers}
+                    projectOwner={projectOwner} /* ✅ FIXED: Pass projectOwner to CommentForm */
                     onCommentCreated={handleReplyCreated}
                     onCancel={() => onReplyFormToggle(false)}
                     placeholder="Write a reply..."

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import MentionInput from './MentionInput';
+import CommentReplies from './CommentReplies'; // ✅ Import the real CommentReplies component
 
 const CommentItem = ({ 
     comment, 
     projectMembers = [], 
-    projectOwner = null, // ✅ NEW: Add project owner prop
+    projectOwner = null,
     currentUser, 
     onCommentUpdated, 
     onCommentDeleted,
@@ -78,6 +79,15 @@ const CommentItem = ({
         }
     };
 
+    // ✅ FIXED: Handle reply button click - show both replies AND reply form
+    const handleReplyClick = () => {
+        setShowReplyForm(!showReplyForm);
+        // Also show the replies section so the reply form is visible
+        if (!showReplyForm) {
+            setShowReplies(true);
+        }
+    };
+
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleString();
     };
@@ -114,7 +124,7 @@ const CommentItem = ({
                 <EditCommentForm
                     initialContent={comment.content}
                     projectMembers={projectMembers}
-                    projectOwner={projectOwner} /* ✅ NEW: Pass project owner */
+                    projectOwner={projectOwner}
                     onSubmit={handleSaveEdit}
                     onCancel={handleCancelEdit}
                 />
@@ -159,7 +169,7 @@ const CommentItem = ({
             {!isReply && (
                 <div className="comment-footer">
                     <button
-                        onClick={() => setShowReplyForm(!showReplyForm)}
+                        onClick={handleReplyClick} 
                         className="btn-text"
                     >
                         Reply
@@ -176,12 +186,13 @@ const CommentItem = ({
                 </div>
             )}
 
-            {showReplies && !isReply && (
+            {/* ✅ FIXED: Show CommentReplies when either showReplies OR showReplyForm is true */}
+            {(showReplies || showReplyForm) && !isReply && (
                 <CommentReplies
                     parentCommentId={comment.id}
                     taskId={comment.task_id}
                     projectMembers={projectMembers}
-                    projectOwner={projectOwner} /* ✅ NEW: Pass project owner */
+                    projectOwner={projectOwner}
                     currentUser={currentUser}
                     onCommentUpdated={onCommentUpdated}
                     onCommentDeleted={onCommentDeleted}
@@ -197,7 +208,7 @@ const CommentItem = ({
 const EditCommentForm = ({ 
     initialContent, 
     projectMembers, 
-    projectOwner = null, // ✅ NEW: Add project owner prop
+    projectOwner = null,
     onSubmit, 
     onCancel 
 }) => {
@@ -224,7 +235,7 @@ const EditCommentForm = ({
                 onChange={setContent}
                 onMentionsChange={setMentions}
                 projectMembers={projectMembers}
-                projectOwner={projectOwner} /* ✅ NEW: Pass project owner */
+                projectOwner={projectOwner}
                 placeholder="Edit your comment..."
                 disabled={isSubmitting}
             />
@@ -246,32 +257,6 @@ const EditCommentForm = ({
                 </button>
             </div>
         </form>
-    );
-};
-
-// Comment Replies Component (placeholder - you'll need to implement this if you have nested comments)
-const CommentReplies = ({ 
-    parentCommentId, 
-    taskId, 
-    projectMembers, 
-    projectOwner, // ✅ NEW: Add project owner prop
-    currentUser, 
-    onCommentUpdated, 
-    onCommentDeleted, 
-    showReplyForm, 
-    onReplyFormToggle 
-}) => {
-    // Implementation would be similar to CommentsList but for replies
-    // For now, just a placeholder
-    return (
-        <div className="comment-replies">
-            {showReplyForm && (
-                <div className="reply-form">
-                    {/* Reply form would go here */}
-                    <p>Reply form (to be implemented)</p>
-                </div>
-            )}
-        </div>
     );
 };
 
