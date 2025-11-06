@@ -1,4 +1,4 @@
-// backend/routes/soloProjectRoutes.js
+// backend/routes/soloProjectRoutes.js - ENHANCED WITH TIMELINE ENDPOINTS
 const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const authMiddleware = require('../middleware/auth');
@@ -89,6 +89,48 @@ const createActivityValidation = [
   body('type')
     .isIn(['task_completed', 'task_started', 'task_created', 'goal_created', 'note_created', 'project_updated', 'file_uploaded'])
     .withMessage('Invalid activity type')
+];
+
+// ✅ NEW: Timeline post validation rules
+const createTimelinePostValidation = [
+  body('github_url')
+    .optional()
+    .isURL()
+    .withMessage('GitHub URL must be valid'),
+  
+  body('live_demo_url')
+    .optional()
+    .isURL()
+    .withMessage('Live demo URL must be valid'),
+  
+  body('custom_description')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('Custom description must not exceed 2000 characters')
+];
+
+const updateTimelinePostValidation = [
+  body('github_url')
+    .optional()
+    .isURL()
+    .withMessage('GitHub URL must be valid'),
+  
+  body('live_demo_url')
+    .optional()
+    .isURL()
+    .withMessage('Live demo URL must be valid'),
+  
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('Description must not exceed 2000 characters'),
+  
+  body('visibility')
+    .optional()
+    .isIn(['public', 'private'])
+    .withMessage('Visibility must be public or private')
 ];
 
 // All routes require authentication
@@ -262,6 +304,42 @@ router.put(
   body('live_demo_url').optional().isURL().withMessage('Live demo URL must be valid'),
   handleValidationErrors,
   soloProjectController.updateProjectInfo
+);
+
+// ===== ✅ NEW: TIMELINE POST ROUTES =====
+
+// GET /api/solo-projects/:projectId/timeline-post - Get timeline post
+router.get(
+  '/:projectId/timeline-post',
+  projectIdValidation,
+  handleValidationErrors,
+  soloProjectController.getTimelinePost
+);
+
+// POST /api/solo-projects/:projectId/timeline-post - Create timeline post (manual publish)
+router.post(
+  '/:projectId/timeline-post',
+  projectIdValidation,
+  createTimelinePostValidation,
+  handleValidationErrors,
+  soloProjectController.createTimelinePost
+);
+
+// PUT /api/solo-projects/:projectId/timeline-post - Update timeline post
+router.put(
+  '/:projectId/timeline-post',
+  projectIdValidation,
+  updateTimelinePostValidation,
+  handleValidationErrors,
+  soloProjectController.updateTimelinePost
+);
+
+// DELETE /api/solo-projects/:projectId/timeline-post - Delete timeline post
+router.delete(
+  '/:projectId/timeline-post',
+  projectIdValidation,
+  handleValidationErrors,
+  soloProjectController.deleteTimelinePost
 );
 
 module.exports = router;

@@ -33,6 +33,18 @@ const checkProjectCompletionInternal = async (projectId, userId) => {
 
     // ⬇️ CREATE TIMELINE POST
     await createTimelinePostFromProject(projectId, userId, 'solo');
+
+     const { data: existingPost } = await supabase
+    .from('timeline_posts')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .single();
+
+  if (!existingPost) {
+    await createTimelinePostFromProject(projectId, userId, 'solo');
+    console.log('✅ Auto-published to timeline on completion');
+  }
     const { data: goals } = await supabase
       .from('solo_project_goals')
       .select('status, progress')

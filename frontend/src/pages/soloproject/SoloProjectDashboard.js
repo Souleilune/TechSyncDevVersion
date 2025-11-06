@@ -6,6 +6,7 @@ import SoloProjectService from '../../services/soloProjectService';
 import { taskService } from '../../services/taskService';
 import { BarChart3, Target, Clock, TrendingUp, Plus, StickyNote, FileText, Award, Trophy, RefreshCw, PanelLeft } from 'lucide-react';
 import AwardsDisplay from '../../components/AwardsDisplay';
+import TimelinePublisher from '../components/TimelinePublisher';
 
 // Background symbols component - WITH FLOATING ANIMATIONS
 const BackgroundSymbols = () => (
@@ -861,6 +862,11 @@ function SoloProjectDashboard() {
       >
         <PanelLeft size={20} />
       </button>
+      <TimelinePublisher 
+        projectId={projectId}
+        projectTitle={projectData?.project?.title}
+        projectDescription={projectData?.project?.description}
+      />
 
       <div style={styles.container}>
         <BackgroundSymbols />
