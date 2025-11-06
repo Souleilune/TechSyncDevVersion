@@ -668,9 +668,8 @@ const TimelineFeed = () => {
       }}>
         {[
           { value: 'all', label: 'All Projects' },
-          { value: 'friends', label: 'Friends' },
-          { value: 'solo', label: 'Solo' },
-          { value: 'group', label: 'Group' }
+          { value: 'group', label: 'Group' },
+          { value: 'solo', label: 'Solo' }
         ].map(({ value, label }) => (
           <button
             key={value}
