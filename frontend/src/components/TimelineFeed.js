@@ -13,7 +13,8 @@ import {
   MoreVertical,
   Send,
   Edit2,
-  Trash2
+  Trash2,
+  PartyPopper
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -308,9 +309,18 @@ const TimelineFeed = () => {
 
       {/* Post Content */}
       <div style={{ marginBottom: '16px' }}>
-        <h2 style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>
-          {post.title}
-        </h2>
+  <h2 style={{ 
+  color: 'white', 
+  fontSize: '20px', 
+  fontWeight: 'bold', 
+  marginBottom: '8px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px'
+}}>
+  <PartyPopper size={22} color="#f59e0b" />
+  {post.title.replace(/🎉|🎊|[\u{1F389}\u{1F38A}]/gu, '').trim()}
+</h2>
         {post.description && (
           <p style={{ color: '#d1d5db', fontSize: '14px', lineHeight: '1.6', marginBottom: '12px' }}>
             {post.description.length > 200 
@@ -600,7 +610,7 @@ const TimelineFeed = () => {
   }
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '100%', paddingRight: '40px' }}>
       {/* Filter Tabs */}
       <div style={{
         display: 'flex',

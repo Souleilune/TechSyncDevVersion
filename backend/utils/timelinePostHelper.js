@@ -81,7 +81,7 @@ const createTimelinePostFromProject = async (projectId, userId, projectType = 'g
         project_id: projectId,
         user_id: userId,
         post_type: postType,
-        title: `🎉 Completed: ${project.title}`,
+        title: `Completed: ${project.title}`,
         description: project.description,
         project_title: project.title,
         project_type: projectType,

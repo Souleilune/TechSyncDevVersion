@@ -1,5 +1,6 @@
 // backend/controllers/collaborativeProjectCompletion.js
 const supabase = require('../config/supabase');
+const { createTimelinePostsForTeam } = require('../utils/timelinePostHelper');
 
 // ===== HELPER FUNCTIONS =====
 

@@ -71,7 +71,7 @@ const TimelinePublisher = ({ projectId, projectTitle, projectDescription }) => {
       
       await TimelinePublishingService.publishToTimeline(projectId, formData);
       
-      setSuccess('🎉 Published to timeline successfully!');
+      setSuccess(' Published to timeline successfully!');
       setShowModal(false);
       await fetchTimelineStatus();
       

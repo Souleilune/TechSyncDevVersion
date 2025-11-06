@@ -11,7 +11,7 @@ class TimelinePublishingService {
   static async getTimelineStatus(projectId) {
     try {
       console.log('🔄 Checking timeline status for project:', projectId);
-      const response = await api.get(`/solo-projects/${projectId}/timeline`);
+      const response = await api.get(`/solo-projects/${projectId}/timeline-post`);
       console.log('✅ Timeline status retrieved');
       return response.data;
     } catch (error) {
@@ -29,7 +29,7 @@ class TimelinePublishingService {
   static async publishToTimeline(projectId, publishData = {}) {
     try {
       console.log('📤 Publishing to timeline:', projectId);
-      const response = await api.post(`/solo-projects/${projectId}/timeline`, publishData);
+      const response = await api.post(`/solo-projects/${projectId}/timeline-post`, publishData);
       console.log('✅ Published to timeline successfully');
       return response.data;
     } catch (error) {
@@ -47,7 +47,7 @@ class TimelinePublishingService {
   static async updateTimelinePost(projectId, updateData) {
     try {
       console.log('✏️ Updating timeline post:', projectId);
-      const response = await api.put(`/solo-projects/${projectId}/timeline`, updateData);
+      const response = await api.put(`/solo-projects/${projectId}/timeline-post`, updateData);
       console.log('✅ Timeline post updated successfully');
       return response.data;
     } catch (error) {
@@ -64,7 +64,7 @@ class TimelinePublishingService {
   static async deleteTimelinePost(projectId) {
     try {
       console.log('🗑️ Deleting timeline post:', projectId);
-      const response = await api.delete(`/solo-projects/${projectId}/timeline`);
+      const response = await api.delete(`/solo-projects/${projectId}/timeline-post`);
       console.log('✅ Timeline post deleted successfully');
       return response.data;
     } catch (error) {

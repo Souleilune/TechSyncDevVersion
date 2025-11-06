@@ -33,18 +33,6 @@ const checkProjectCompletionInternal = async (projectId, userId) => {
 
     // ⬇️ CREATE TIMELINE POST
     await createTimelinePostFromProject(projectId, userId, 'solo');
-
-     const { data: existingPost } = await supabase
-    .from('timeline_posts')
-    .select('id')
-    .eq('project_id', projectId)
-    .eq('user_id', userId)
-    .single();
-
-  if (!existingPost) {
-    await createTimelinePostFromProject(projectId, userId, 'solo');
-    console.log('✅ Auto-published to timeline on completion');
-  }
     const { data: goals } = await supabase
       .from('solo_project_goals')
       .select('status, progress')
@@ -1473,6 +1461,235 @@ const updateProjectInfo = async (req, res) => {
   }
 };
 
+const getTimelinePost = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const userId = req.user.id;
+
+    console.log('📰 Getting timeline post for project:', projectId);
+
+    const accessCheck = await verifySoloProjectAccess(projectId, userId);
+    if (!accessCheck.success) {
+      return res.status(accessCheck.statusCode || 404).json({
+        success: false,
+        message: accessCheck.message
+      });
+    }
+
+    const { data: timelinePost, error } = await supabase
+      .from('timeline_posts')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching timeline post:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch timeline post'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        isPublished: !!timelinePost,
+        timelinePost: timelinePost || null
+      }
+    });
+
+  } catch (error) {
+    console.error('💥 Get timeline post error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch timeline post'
+    });
+  }
+};
+
+const publishToTimeline = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { github_url, live_demo_url, custom_description } = req.body;
+    const userId = req.user.id;
+
+    console.log('📤 Publishing project to timeline:', projectId);
+
+    const accessCheck = await verifySoloProjectAccess(projectId, userId);
+    if (!accessCheck.success) {
+      return res.status(accessCheck.statusCode || 404).json({
+        success: false,
+        message: accessCheck.message
+      });
+    }
+
+    const { data: existingPost } = await supabase
+      .from('timeline_posts')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .single();
+
+    if (existingPost) {
+      return res.status(400).json({
+        success: false,
+        message: 'Project is already published to timeline'
+      });
+    }
+
+    const { data: project } = await supabase
+      .from('projects')
+      .select('title, description')
+      .eq('id', projectId)
+      .single();
+
+    const { data: timelinePost, error: postError } = await supabase
+      .from('timeline_posts')
+      .insert({
+        project_id: projectId,
+        user_id: userId,
+        post_type: 'solo_completion',
+        title: `🎉 Completed: ${project.title}`,
+        description: custom_description || project.description,
+        project_title: project.title,
+        project_type: 'solo',
+        github_url: github_url || null,
+        live_demo_url: live_demo_url || null,
+        visibility: 'public'
+      })
+      .select()
+      .single();
+
+    if (postError) {
+      console.error('Error creating timeline post:', postError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to publish to timeline'
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: { timelinePost },
+      message: 'Project published to timeline successfully'
+    });
+
+  } catch (error) {
+    console.error('💥 Publish to timeline error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to publish to timeline'
+    });
+  }
+};
+
+const updateTimelinePost = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { github_url, live_demo_url, description, visibility } = req.body;
+    const userId = req.user.id;
+
+    console.log('✏️ Updating timeline post for project:', projectId);
+
+    const accessCheck = await verifySoloProjectAccess(projectId, userId);
+    if (!accessCheck.success) {
+      return res.status(accessCheck.statusCode || 404).json({
+        success: false,
+        message: accessCheck.message
+      });
+    }
+
+    const updateData = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (github_url !== undefined) updateData.github_url = github_url;
+    if (live_demo_url !== undefined) updateData.live_demo_url = live_demo_url;
+    if (description !== undefined) updateData.description = description;
+    if (visibility !== undefined) updateData.visibility = visibility;
+
+    const { data: timelinePost, error } = await supabase
+      .from('timeline_posts')
+      .update(updateData)
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating timeline post:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update timeline post'
+      });
+    }
+
+    if (!timelinePost) {
+      return res.status(404).json({
+        success: false,
+        message: 'Timeline post not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { timelinePost },
+      message: 'Timeline post updated successfully'
+    });
+
+  } catch (error) {
+    console.error('💥 Update timeline post error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update timeline post'
+    });
+  }
+};
+
+const deleteTimelinePost = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const userId = req.user.id;
+
+    console.log('🗑️ Deleting timeline post for project:', projectId);
+
+    const accessCheck = await verifySoloProjectAccess(projectId, userId);
+    if (!accessCheck.success) {
+      return res.status(accessCheck.statusCode || 404).json({
+        success: false,
+        message: accessCheck.message
+      });
+    }
+
+    const { error } = await supabase
+      .from('timeline_posts')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error deleting timeline post:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete timeline post'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Timeline post deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('💥 Delete timeline post error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete timeline post'
+    });
+  }
+};
+
 module.exports = {
   // Dashboard
   getDashboardData,
@@ -1499,6 +1716,15 @@ module.exports = {
   // Project Info
   getProjectInfo,
   updateProjectInfo,
+  checkAndAwardProgress,
+  checkProjectCompletionInternal,
+  checkWeeklyChallengeInternal,
+
+  getTimelinePost,
+  publishToTimeline,
+  updateTimelinePost,
+  deleteTimelinePost,
+
   checkAndAwardProgress,
   checkProjectCompletionInternal,
   checkWeeklyChallengeInternal

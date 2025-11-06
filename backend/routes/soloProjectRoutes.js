@@ -322,7 +322,7 @@ router.post(
   projectIdValidation,
   createTimelinePostValidation,
   handleValidationErrors,
-  soloProjectController.createTimelinePost
+  soloProjectController.publishToTimeline
 );
 
 // PUT /api/solo-projects/:projectId/timeline-post - Update timeline post
