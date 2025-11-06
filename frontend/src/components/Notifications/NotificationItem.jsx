@@ -1,5 +1,7 @@
+// frontend/src/components/Notifications/NotificationItem.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AtSign, MessageCircle, FileText, Bell } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 
 const NotificationItem = ({ notification, onClose }) => {
@@ -23,13 +25,13 @@ const NotificationItem = ({ notification, onClose }) => {
     const getNotificationIcon = (type) => {
         switch (type) {
             case 'mention':
-                return '@';
+                return <AtSign size={16} />;
             case 'reply':
-                return '💬';
+                return <MessageCircle size={16} />;
             case 'task_comment':
-                return '📝';
+                return <FileText size={16} />;
             default:
-                return '🔔';
+                return <Bell size={16} />;
         }
     };
 

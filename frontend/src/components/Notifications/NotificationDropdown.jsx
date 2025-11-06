@@ -1,11 +1,13 @@
 // frontend/src/components/Notifications/NotificationDropdown.jsx
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationContext';
 import NotificationItem from './NotificationItem';
 import LoadingSpinner from '../UI/LoadingSpinner';
 import './Notifications.css';
 
 const NotificationDropdown = ({ onClose }) => {
+    const navigate = useNavigate();
     const { 
         notifications, 
         loading, 
@@ -44,6 +46,11 @@ const NotificationDropdown = ({ onClose }) => {
             console.error('Failed to mark notifications as read:', error);
             setLocalError('Failed to mark notifications as read');
         }
+    };
+
+    const handleViewAll = () => {
+        onClose(); // Close the dropdown first
+        navigate('/notifications'); // Navigate to the all notifications page
     };
 
     const displayError = localError || error;
@@ -125,10 +132,7 @@ const NotificationDropdown = ({ onClose }) => {
             {notifications.length > 0 && (
                 <div className="notification-dropdown-footer">
                     <button 
-                        onClick={() => {
-                            console.log('Navigate to all notifications');
-                            onClose();
-                        }}
+                        onClick={handleViewAll}
                         className="view-all-btn"
                     >
                         View all notifications

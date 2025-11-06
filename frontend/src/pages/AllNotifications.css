@@ -1,0 +1,406 @@
+/* frontend/src/pages/AllNotifications.css */
+.all-notifications-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0f111a 0%, #1a1d29 100%);
+    padding: 32px;
+}
+
+/* Header Section */
+.all-notifications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(79, 127, 255, 0.15);
+}
+
+.header-title-section {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-title-section .header-icon {
+    color: #4F7FFF;
+}
+
+.header-title-section h1 {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #ffffff, #e2e8f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.unread-badge {
+    padding: 4px 12px;
+    background: linear-gradient(135deg, rgba(79, 127, 255, 0.2), rgba(59, 130, 246, 0.15));
+    border: 1px solid rgba(79, 127, 255, 0.3);
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4F7FFF;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.mark-all-read-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, rgba(79, 127, 255, 0.15), rgba(59, 130, 246, 0.1));
+    border: 1px solid rgba(79, 127, 255, 0.3);
+    border-radius: 8px;
+    color: #4F7FFF;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mark-all-read-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(79, 127, 255, 0.25), rgba(59, 130, 246, 0.2));
+    border-color: #4F7FFF;
+    box-shadow: 0 0 16px rgba(79, 127, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.mark-all-read-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Filter Tabs */
+.notification-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 8px;
+    background: rgba(26, 28, 32, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.filter-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-tab:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+}
+
+.filter-tab.active {
+    background: linear-gradient(135deg, rgba(79, 127, 255, 0.2), rgba(59, 130, 246, 0.15));
+    border: 1px solid rgba(79, 127, 255, 0.3);
+    color: #4F7FFF;
+}
+
+.filter-count {
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.filter-tab.active .filter-count {
+    background: rgba(79, 127, 255, 0.3);
+}
+
+/* Content Section */
+.all-notifications-content {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Loading State */
+.notifications-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    gap: 16px;
+    color: #94a3b8;
+}
+
+/* Error State */
+.notifications-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    gap: 16px;
+    color: #ef4444;
+}
+
+.retry-button {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1));
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #ef4444;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(220, 38, 38, 0.2));
+    border-color: #ef4444;
+    transform: translateY(-1px);
+}
+
+/* Empty State */
+.notifications-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    text-align: center;
+}
+
+.notifications-empty .empty-icon {
+    color: #4F7FFF;
+    opacity: 0.3;
+    margin-bottom: 24px;
+}
+
+.notifications-empty h2 {
+    margin: 0 0 12px 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.notifications-empty p {
+    margin: 0;
+    font-size: 16px;
+    color: #94a3b8;
+}
+
+/* Notifications List */
+.notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Notification Card */
+.notification-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(26, 28, 32, 0.95), rgba(15, 17, 22, 0.90));
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(20px);
+}
+
+.notification-card:hover {
+    background: linear-gradient(135deg, rgba(31, 35, 41, 0.95), rgba(20, 23, 28, 0.90));
+    border-color: rgba(79, 127, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.notification-card.unread {
+    border-color: rgba(79, 127, 255, 0.3);
+    background: linear-gradient(90deg, rgba(79, 127, 255, 0.15), rgba(79, 127, 255, 0.08));
+}
+
+.notification-card.unread::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, #4F7FFF, #3b82f6);
+    border-radius: 12px 0 0 12px;
+}
+
+.notification-card.unread:hover {
+    background: linear-gradient(90deg, rgba(79, 127, 255, 0.2), rgba(79, 127, 255, 0.12));
+    border-color: #4F7FFF;
+}
+
+/* Icon */
+.notification-card-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 18px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(79, 127, 255, 0.2), rgba(59, 130, 246, 0.15));
+    border: 1px solid rgba(79, 127, 255, 0.3);
+    color: #4F7FFF;
+}
+
+/* Content */
+.notification-card-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-card-message {
+    margin: 0 0 8px 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #e2e8f0;
+    font-weight: 500;
+}
+
+.notification-card-preview {
+    margin: 12px 0;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    font-style: italic;
+}
+
+.notification-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.notification-time {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.unread-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: rgba(79, 127, 255, 0.2);
+    border: 1px solid rgba(79, 127, 255, 0.3);
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #4F7FFF;
+}
+
+/* Delete Button */
+.notification-delete-button {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    color: #64748b;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.notification-card:hover .notification-delete-button {
+    opacity: 1;
+}
+
+.notification-delete-button:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.notification-delete-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .all-notifications-page {
+        padding: 20px;
+    }
+
+    .all-notifications-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .header-title-section h1 {
+        font-size: 24px;
+    }
+
+    .notification-filters {
+        flex-direction: column;
+    }
+
+    .filter-tab {
+        justify-content: flex-start;
+    }
+
+    .notification-card {
+        padding: 16px;
+    }
+
+    .notification-card-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    .notification-delete-button {
+        opacity: 1;
+    }
+}
+
+/* Animation */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.notification-card {
+    animation: slideInUp 0.3s ease-out;
+}

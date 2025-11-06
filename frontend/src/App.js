@@ -27,6 +27,7 @@ import PersonalLearnings from './pages/PersonalLearnings';
 import CourseLearn from './pages/CourseLearn';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AllNotifications from './pages/AllNotifications';
 
 
 // Solo project components
@@ -965,6 +966,17 @@ function App() {
                     <ProtectedRoute>
                       <Layout>
                         <Profile />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="/notifications" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <AllNotifications />
                       </Layout>
                     </ProtectedRoute>
                   } 
