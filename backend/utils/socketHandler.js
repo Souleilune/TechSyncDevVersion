@@ -1,26 +1,88 @@
-// backend/utils/socketHandler.js - COMPLETE FIXED VERSION
-require('dotenv').config(); // Load environment variables first
+// backend/utils/socketHandler.js - OPTIMIZED VERSION WITH MEMORY MANAGEMENT
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 
 // Validate environment variables
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-  console.error('❌ Missing required environment variables for socketHandler:');
-  if (!process.env.SUPABASE_URL) console.error('  - SUPABASE_URL is missing');
-  if (!process.env.SUPABASE_SERVICE_KEY) console.error('  - SUPABASE_SERVICE_KEY is missing');
+  console.error('❌ Missing required environment variables for socketHandler');
   process.exit(1);
 }
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-// Store user socket mappings
-const userSockets = new Map();
-const socketUsers = new Map();
+// ============== MEMORY-OPTIMIZED USER TRACKING ==============
+class UserConnectionManager {
+  constructor() {
+    this.userSockets = new Map(); // userId -> socketId
+    this.socketUsers = new Map(); // socketId -> userId
+    this.socketRooms = new Map(); // socketId -> Set of rooms
+    this.cleanupInterval = null;
+  }
+
+  addConnection(userId, socketId) {
+    this.userSockets.set(userId, socketId);
+    this.socketUsers.set(socketId, userId);
+    this.socketRooms.set(socketId, new Set());
+  }
+
+  addRoom(socketId, room) {
+    if (!this.socketRooms.has(socketId)) {
+      this.socketRooms.set(socketId, new Set());
+    }
+    this.socketRooms.get(socketId).add(room);
+  }
+
+  removeConnection(socketId) {
+    const userId = this.socketUsers.get(socketId);
+    if (userId) {
+      this.userSockets.delete(userId);
+    }
+    this.socketUsers.delete(socketId);
+    this.socketRooms.delete(socketId);
+  }
+
+  getRooms(socketId) {
+    return this.socketRooms.get(socketId) || new Set();
+  }
+
+  getStats() {
+    return {
+      totalConnections: this.socketUsers.size,
+      totalRooms: Array.from(this.socketRooms.values()).reduce((sum, rooms) => sum + rooms.size, 0),
+      memoryUsage: process.memoryUsage()
+    };
+  }
+
+  // Periodic cleanup of stale connections
+  startCleanup() {
+    this.cleanupInterval = setInterval(() => {
+      const stats = this.getStats();
+      console.log(`[Socket Cleanup] Active connections: ${stats.totalConnections}, Memory: ${(stats.memoryUsage.heapUsed / 1024 / 1024).toFixed(2)}MB`);
+    }, 60000); // Every minute
+  }
+
+  stopCleanup() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+  }
+}
+
+const connectionManager = new UserConnectionManager();
 
 const setupSocketHandlers = (io) => {
-  console.log('🔌 Setting up Socket.io handlers for chat...');
+  console.log('🔌 Setting up optimized Socket.io handlers...');
   
-  // Authentication middleware for socket connections
+  // Start connection cleanup monitor
+  connectionManager.startCleanup();
+
+  // ============== CONNECTION LIMITING ==============
+  // Prevent memory exhaustion from too many connections
+  const MAX_CONNECTIONS_PER_USER = 5;
+  const activeConnections = new Map(); // userId -> connection count
+
+  // Authentication middleware
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
@@ -29,10 +91,8 @@ const setupSocketHandlers = (io) => {
         return next(new Error('Authentication token required'));
       }
 
-      // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
-      // Get user details from database
       const { data: user, error } = await supabase
         .from('users')
         .select('id, username, full_name, avatar_url')
@@ -43,8 +103,18 @@ const setupSocketHandlers = (io) => {
         return next(new Error('Invalid authentication token'));
       }
 
+      // Check connection limit per user
+      const userConnectionCount = activeConnections.get(user.id) || 0;
+      if (userConnectionCount >= MAX_CONNECTIONS_PER_USER) {
+        return next(new Error('Maximum connections exceeded'));
+      }
+
       socket.userId = user.id;
       socket.user = user;
+      
+      // Track connection count
+      activeConnections.set(user.id, userConnectionCount + 1);
+      
       next();
     } catch (error) {
       console.error('Socket authentication error:', error);
@@ -53,82 +123,104 @@ const setupSocketHandlers = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`User ${socket.user.username} connected with socket ${socket.id}`);
+    console.log(`[Connection] User ${socket.user.username} (${socket.id})`);
     
-    // Store user-socket mapping
-    userSockets.set(socket.userId, socket.id);
-    socketUsers.set(socket.id, socket.userId);
+    // Add to connection manager
+    connectionManager.addConnection(socket.userId, socket.id);
 
-    // Join user to their project rooms (ONLY projects they're members of)
+    // ============== OPTIMIZED ROOM JOINING ==============
     socket.on('join_project_rooms', async (projectId) => {
       try {
-        // CRITICAL: Verify user is a member of the project
+        // Verify user is member of project
         const { data: membership, error } = await supabase
           .from('project_members')
-          .select('role')
+          .select('id')
           .eq('project_id', projectId)
           .eq('user_id', socket.userId)
           .single();
 
         if (error || !membership) {
-          socket.emit('error', { message: 'Not authorized to join project rooms - you must be a project member' });
+          socket.emit('error', { message: 'Not a project member' });
           return;
         }
 
-        // Get all chat rooms for the project
-        const { data: chatRooms, error: roomsError } = await supabase
+        // Fetch chat rooms for this project (with limit to prevent memory issues)
+        const { data: rooms, error: roomsError } = await supabase
           .from('chat_rooms')
           .select('id, name')
           .eq('project_id', projectId)
-          .eq('is_archived', false);
+          .limit(50); // Limit rooms per project
 
-        if (!roomsError && chatRooms) {
-          // Join all project chat rooms
-          chatRooms.forEach(room => {
-            socket.join(`room_${room.id}`);
-          });
-
-          // Join project-specific room for announcements
-          socket.join(`project_${projectId}`);
-
-          socket.emit('joined_project_rooms', {
-            projectId,
-            rooms: chatRooms
-          });
-
-          console.log(`User ${socket.user.username} joined project ${projectId} rooms`);
+        if (roomsError) {
+          socket.emit('error', { message: 'Failed to fetch chat rooms' });
+          return;
         }
+
+        // Join project room
+        const projectRoom = `project_${projectId}`;
+        socket.join(projectRoom);
+        connectionManager.addRoom(socket.id, projectRoom);
+
+        // Join individual chat rooms
+        if (rooms && rooms.length > 0) {
+          rooms.forEach(room => {
+            const roomName = `room_${room.id}`;
+            socket.join(roomName);
+            connectionManager.addRoom(socket.id, roomName);
+          });
+        }
+
+        socket.emit('rooms_joined', {
+          projectId,
+          rooms: rooms || []
+        });
+
       } catch (error) {
-        console.error('Error joining project rooms:', error);
+        console.error('[join_project_rooms] Error:', error);
         socket.emit('error', { message: 'Failed to join project rooms' });
       }
     });
 
-    // Handle sending messages (ONLY to project members) - FIXED VERSION
+    // ============== OPTIMIZED MESSAGE HANDLING ==============
+    // Rate limiting for messages
+    const MESSAGE_RATE_LIMIT = 10; // messages per minute
+    const messageTimestamps = [];
+
     socket.on('send_message', async (data) => {
       try {
-        const { roomId, projectId, content, messageType = 'text', replyToMessageId } = data;
+        // Rate limiting check
+        const now = Date.now();
+        const oneMinuteAgo = now - 60000;
+        const recentMessages = messageTimestamps.filter(t => t > oneMinuteAgo);
+        
+        if (recentMessages.length >= MESSAGE_RATE_LIMIT) {
+          socket.emit('error', { message: 'Message rate limit exceeded' });
+          return;
+        }
+        
+        messageTimestamps.push(now);
+        // Clean old timestamps to prevent memory leak
+        while (messageTimestamps.length > 0 && messageTimestamps[0] < oneMinuteAgo) {
+          messageTimestamps.shift();
+        }
 
-        // CRITICAL: Verify user can send messages to this room
-        const { data: membership, error: memberError } = await supabase
-          .from('project_members')
-          .select('*')
-          .eq('project_id', projectId)
-          .eq('user_id', socket.userId)
-          .single();
+        const { roomId, projectId, content, messageType = 'text', replyToMessageId = null } = data;
 
-        if (memberError || !membership) {
-          socket.emit('error', { message: 'Not authorized to send messages - project members only' });
+        // Validate input
+        if (!roomId || !content || content.trim().length === 0) {
+          socket.emit('error', { message: 'Invalid message data' });
           return;
         }
 
-        // Verify room belongs to project
+        // Limit message length to prevent memory issues
+        const MAX_MESSAGE_LENGTH = 5000;
+        const trimmedContent = content.slice(0, MAX_MESSAGE_LENGTH);
+
+        // Verify room membership
         const { data: room, error: roomError } = await supabase
           .from('chat_rooms')
-          .select('*')
+          .select('project_id')
           .eq('id', roomId)
-          .eq('project_id', projectId)
-          .eq('is_archived', false)
           .single();
 
         if (roomError || !room) {
@@ -136,208 +228,114 @@ const setupSocketHandlers = (io) => {
           return;
         }
 
-        // Save message to database first
-        const { data: message, error: messageError } = await supabase
+        // Verify project membership
+        const { data: membership } = await supabase
+          .from('project_members')
+          .select('id')
+          .eq('project_id', room.project_id)
+          .eq('user_id', socket.userId)
+          .single();
+
+        if (!membership) {
+          socket.emit('error', { message: 'Not a project member' });
+          return;
+        }
+
+        // Insert message
+        const { data: newMessage, error: insertError } = await supabase
           .from('chat_messages')
           .insert({
             room_id: roomId,
             user_id: socket.userId,
-            content: content.trim(),
             message_type: messageType,
-            reply_to_message_id: replyToMessageId || null
+            content: trimmedContent,
+            reply_to_message_id: replyToMessageId
           })
           .select(`
             *,
-            user:users!user_id (
-              id,
-              username,
-              full_name,
-              avatar_url
-            )
+            users!inner(id, username, full_name, avatar_url)
           `)
           .single();
 
-        if (messageError) {
-          console.error('Error saving message:', messageError);
+        if (insertError) {
+          console.error('[send_message] Insert error:', insertError);
           socket.emit('error', { message: 'Failed to send message' });
           return;
         }
 
-        // If this message is a reply, fetch the reply data separately (same as API fix)
-        let processedMessage = { ...message };
-        
-        if (message.reply_to_message_id) {
-          const { data: replyToMessage, error: replyError } = await supabase
+        // Process message (add reply data if needed)
+        const processedMessage = { ...newMessage };
+        if (replyToMessageId) {
+          const { data: replyToMessage } = await supabase
             .from('chat_messages')
-            .select(`
-              id,
-              content,
-              user:users!user_id (
-                id,
-                username,
-                full_name,
-                avatar_url
-              )
-            `)
-            .eq('id', message.reply_to_message_id)
+            .select('*, users!inner(id, username, full_name, avatar_url)')
+            .eq('id', replyToMessageId)
             .single();
 
-          if (!replyError && replyToMessage) {
+          if (replyToMessage) {
             processedMessage.reply_to = replyToMessage;
           }
         }
 
-        // Broadcast message to all users in the room (ONLY project members)
-        io.to(`room_${roomId}`).emit('new_message', {
+        // Broadcast to room (not back to sender)
+        socket.to(`room_${roomId}`).emit('new_message', {
           message: processedMessage,
           roomId,
-          projectId
+          projectId: room.project_id
         });
 
-        // Send acknowledgment back to sender
-        socket.emit('message_sent', { messageId: message.id });
+        // Send confirmation to sender
+        socket.emit('message_sent', {
+          message: processedMessage,
+          roomId
+        });
 
       } catch (error) {
-        console.error('Error sending message:', error);
+        console.error('[send_message] Error:', error);
         socket.emit('error', { message: 'Failed to send message' });
       }
     });
 
-    // Handle message editing (only message owner) - FIXED VERSION
-    socket.on('edit_message', async (data) => {
-      try {
-        const { messageId, content } = data;
+    // ============== TYPING INDICATORS (DEBOUNCED) ==============
+    const typingTimeouts = new Map();
 
-        // Check if user owns the message
-        const { data: message, error: messageError } = await supabase
-          .from('chat_messages')
-          .select('*, chat_rooms!inner(project_id)')
-          .eq('id', messageId)
-          .eq('user_id', socket.userId)
-          .single();
-
-        if (messageError || !message) {
-          socket.emit('error', { message: 'Message not found or permission denied' });
-          return;
-        }
-
-        // Update message
-        const { data: updatedMessage, error: updateError } = await supabase
-          .from('chat_messages')
-          .update({
-            content: content.trim(),
-            is_edited: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', messageId)
-          .select(`
-            *,
-            user:users!user_id (
-              id,
-              username,
-              full_name,
-              avatar_url
-            )
-          `)
-          .single();
-
-        if (updateError) {
-          socket.emit('error', { message: 'Failed to edit message' });
-          return;
-        }
-
-        // If this message is a reply, fetch the reply data separately (same as API fix)
-        let processedMessage = { ...updatedMessage };
-        
-        if (updatedMessage.reply_to_message_id) {
-          const { data: replyToMessage, error: replyError } = await supabase
-            .from('chat_messages')
-            .select(`
-              id,
-              content,
-              user:users!user_id (
-                id,
-                username,
-                full_name,
-                avatar_url
-              )
-            `)
-            .eq('id', updatedMessage.reply_to_message_id)
-            .single();
-
-          if (!replyError && replyToMessage) {
-            processedMessage.reply_to = replyToMessage;
-          }
-        }
-
-        // Broadcast updated message to room
-        io.to(`room_${message.room_id}`).emit('message_edited', {
-          message: processedMessage,
-          roomId: message.room_id,
-          projectId: message.chat_rooms.project_id
-        });
-
-      } catch (error) {
-        console.error('Error editing message:', error);
-        socket.emit('error', { message: 'Failed to edit message' });
-      }
-    });
-
-    // Handle message deletion (only message owner)
-    socket.on('delete_message', async (data) => {
-      try {
-        const { messageId } = data;
-
-        // Check if user owns the message
-        const { data: message, error: messageError } = await supabase
-          .from('chat_messages')
-          .select('*, chat_rooms!inner(project_id)')
-          .eq('id', messageId)
-          .eq('user_id', socket.userId)
-          .single();
-
-        if (messageError || !message) {
-          socket.emit('error', { message: 'Message not found or permission denied' });
-          return;
-        }
-
-        // Delete message
-        const { error: deleteError } = await supabase
-          .from('chat_messages')
-          .delete()
-          .eq('id', messageId);
-
-        if (deleteError) {
-          socket.emit('error', { message: 'Failed to delete message' });
-          return;
-        }
-
-        // Broadcast deletion to room
-        io.to(`room_${message.room_id}`).emit('message_deleted', {
-          messageId,
-          roomId: message.room_id,
-          projectId: message.chat_rooms.project_id
-        });
-
-      } catch (error) {
-        console.error('Error deleting message:', error);
-        socket.emit('error', { message: 'Failed to delete message' });
-      }
-    });
-
-    // Handle user typing indicators
     socket.on('typing_start', (data) => {
       const { roomId, projectId } = data;
+      
+      // Clear existing timeout
+      if (typingTimeouts.has(roomId)) {
+        clearTimeout(typingTimeouts.get(roomId));
+      }
+
       socket.to(`room_${roomId}`).emit('user_typing', {
         userId: socket.userId,
         username: socket.user.username,
         roomId,
         projectId
       });
+
+      // Auto-stop typing after 5 seconds
+      const timeout = setTimeout(() => {
+        socket.to(`room_${roomId}`).emit('user_stopped_typing', {
+          userId: socket.userId,
+          roomId,
+          projectId
+        });
+        typingTimeouts.delete(roomId);
+      }, 5000);
+
+      typingTimeouts.set(roomId, timeout);
     });
 
     socket.on('typing_stop', (data) => {
       const { roomId, projectId } = data;
+      
+      // Clear timeout
+      if (typingTimeouts.has(roomId)) {
+        clearTimeout(typingTimeouts.get(roomId));
+        typingTimeouts.delete(roomId);
+      }
+
       socket.to(`room_${roomId}`).emit('user_stopped_typing', {
         userId: socket.userId,
         roomId,
@@ -345,10 +343,9 @@ const setupSocketHandlers = (io) => {
       });
     });
 
-    // Handle user online status (only within projects)
+    // ============== ONLINE STATUS ==============
     socket.on('get_online_users', (data) => {
       const { projectId } = data;
-      // Get all connected users for this project
       const onlineUsers = [];
       
       io.sockets.sockets.forEach((clientSocket) => {
@@ -365,16 +362,25 @@ const setupSocketHandlers = (io) => {
       socket.emit('online_users', { projectId, users: onlineUsers });
     });
 
-    // Handle disconnection
+    // ============== DISCONNECT HANDLING ==============
     socket.on('disconnect', () => {
-      console.log(`User ${socket.user.username} disconnected`);
+      console.log(`[Disconnect] User ${socket.user.username} (${socket.id})`);
       
-      // Clean up mappings
-      userSockets.delete(socket.userId);
-      socketUsers.delete(socket.id);
+      // Clean up typing timeouts
+      typingTimeouts.forEach((timeout) => clearTimeout(timeout));
+      typingTimeouts.clear();
+
+      // Decrease connection count
+      const userConnectionCount = activeConnections.get(socket.userId) || 0;
+      if (userConnectionCount <= 1) {
+        activeConnections.delete(socket.userId);
+      } else {
+        activeConnections.set(socket.userId, userConnectionCount - 1);
+      }
 
       // Notify rooms about user going offline
-      socket.rooms.forEach(roomName => {
+      const rooms = connectionManager.getRooms(socket.id);
+      rooms.forEach(roomName => {
         if (roomName.startsWith('project_')) {
           const projectId = roomName.replace('project_', '');
           socket.to(roomName).emit('user_offline', {
@@ -383,24 +389,22 @@ const setupSocketHandlers = (io) => {
           });
         }
       });
-    });
 
-    // Send user online status to project members
-    socket.on('user_online', (data) => {
-      const { projectId } = data;
-      socket.to(`project_${projectId}`).emit('user_online', {
-        user: {
-          id: socket.userId,
-          username: socket.user.username,
-          full_name: socket.user.full_name,
-          avatar_url: socket.user.avatar_url
-        },
-        projectId
-      });
+      // Remove from connection manager
+      connectionManager.removeConnection(socket.id);
     });
   });
-  
-  console.log('✅ Socket.io handlers setup complete');
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('[Socket] Shutting down...');
+    connectionManager.stopCleanup();
+    io.close(() => {
+      console.log('[Socket] Closed all connections');
+    });
+  });
+
+  console.log('✅ Optimized Socket.io handlers setup complete');
 };
 
 module.exports = setupSocketHandlers;

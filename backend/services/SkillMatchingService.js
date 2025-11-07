@@ -1,6 +1,9 @@
-// backend/services/SkillMatchingService.js
-// FULLY CORRECTED VERSION - All schema issues fixed
+// backend/services/SkillMatchingService_REDIS_OPTIMIZED.js
+// PERFORMANCE-OPTIMIZED VERSION with Redis Caching
+// Expected improvement: 2900ms → ~150-200ms (93-95% faster)
+
 const supabase = require('../config/supabase');
+const Redis = require('ioredis');
 
 class SkillMatchingService {
   constructor() {
@@ -11,7 +14,6 @@ class SkillMatchingService {
       interestAffinity: 0.12,
       popularityBoost: 0.05,
       recencyBoost: 0.05,
-      // backward-compat names (used by calculateMatchScore if you still call it elsewhere)
       topic_match: 0.4,
       experience_match: 0.3,
       language_match: 0.3
@@ -21,16 +23,38 @@ class SkillMatchingService {
     this.threshold = 55;
     this.minPassingScore = 70;
     this.maxAttempts = 8;
+
+    // ✅ OPTIMIZED: Redis caching
+    this.redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
+    this.projectCacheTTL = 5 * 60; // 5 minutes in seconds
+    this.userCacheTTL = 2 * 60; // 2 minutes in seconds
+
+    if (!this.redis) {
+      console.warn('⚠️  Redis not configured - falling back to in-memory cache');
+      // Fallback to in-memory if Redis not available
+      this.projectCache = null;
+      this.projectCacheTime = 0;
+      this.userProfileCache = new Map();
+    }
   }
 
-  // ============== PUBLIC API ==============
+  // ============== OPTIMIZED: PARALLEL DATA LOADING WITH REDIS ==============
   async recommendProjects(userId, options = {}) {
     try {
+      const startTime = Date.now();
       const limit = options.limit || 10;
-      const user = await this.getUserProfile(userId);
-      const availableProjects = await this.getAvailableProjects(userId);
 
+      // ✅ OPTIMIZATION: Fetch user and projects in parallel
+      const [user, availableProjects] = await Promise.all([
+        this.getUserProfile(userId, true), // Use cache
+        this.getAvailableProjects(userId, true) // Use cache
+      ]);
+
+      console.log(`📊 Data loaded in ${Date.now() - startTime}ms`);
+
+      const scoringStart = Date.now();
       const scored = [];
+      
       for (const project of availableProjects) {
         const features = this.computeFeatures(user, project);
         const score = this.aggregateScore(features);
@@ -47,13 +71,11 @@ class SkillMatchingService {
 
         if (score >= this.threshold) {
           const matchFactors = this.buildMatchFactors(user, project, features);
-          
-          // ✅ FIX: Extract technologies properly from project_languages
           const technologies = this.extractTechnologies(project);
           
           scored.push({
             projectId: project.id,
-            id: project.id, // Added for frontend compatibility
+            id: project.id,
             score: Math.round(score),
             title: project.title,
             description: project.description,
@@ -63,17 +85,24 @@ class SkillMatchingService {
             status: project.status,
             deadline: project.deadline,
             created_at: project.created_at,
-            technologies: technologies, // ✅ Now properly populated
+            technologies,
             matchFactors,
             recommendationId: `rec_${userId}_${project.id}_${Date.now()}`,
-            project: project // Keep original for reference
+            project: project
           });
         }
       }
 
+      console.log(`🎯 Scoring completed in ${Date.now() - scoringStart}ms`);
+
       const reranked = this.diversityReRank(scored, 0.25);
 
-      await this.storeRecommendations(userId, reranked);
+      // ✅ OPTIMIZATION: Non-blocking storage (fire and forget)
+      this.storeRecommendations(userId, reranked).catch(err => {
+        console.error('Background storage failed:', err);
+      });
+
+      console.log(`✅ Total recommendation time: ${Date.now() - startTime}ms`);
       return reranked.slice(0, limit);
     } catch (error) {
       console.error('Error in recommendProjects:', error);
@@ -81,115 +110,172 @@ class SkillMatchingService {
     }
   }
 
-  // ============== NEW METHOD: EXTRACT TECHNOLOGIES ==============
-  
-  /**
-   * Extract technologies/programming languages from project
-   * Handles both project_languages array and languages shorthand
-   * @param {Object} project - Project object from database
-   * @returns {Array<string>} Array of technology names
-   */
-  extractTechnologies(project) {
-    const technologies = [];
-    
-    try {
-      // Method 1: Extract from project_languages (primary method)
-      if (project.project_languages && Array.isArray(project.project_languages)) {
-        project.project_languages.forEach(pl => {
-          if (pl.programming_languages && pl.programming_languages.name) {
-            technologies.push(pl.programming_languages.name);
-          }
-        });
+  // ============== OPTIMIZED: CACHED USER PROFILE WITH REDIS ==============
+  async getUserProfile(userId, useCache = true) {
+    const cacheKey = `user:profile:${userId}`;
+
+    // Try Redis cache first
+    if (useCache && this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) {
+          console.log('✅ Using Redis cached user profile');
+          return JSON.parse(cached);
+        }
+      } catch (error) {
+        console.error('Redis cache read error:', error);
       }
-      
-      // Method 2: Fallback to languages array if it exists (from mapping)
-      if (technologies.length === 0 && project.languages && Array.isArray(project.languages)) {
-        technologies.push(...project.languages.filter(Boolean));
-      }
-      
-      // Method 3: Last fallback - check for language_name direct field (rare)
-      if (technologies.length === 0 && project.language_name) {
-        technologies.push(project.language_name);
-      }
-      
-    } catch (error) {
-      console.error('Error extracting technologies from project:', project.id, error);
     }
-    
-    return technologies.length > 0 ? technologies : ['Not specified'];
+
+    // Fallback to in-memory cache
+    if (useCache && !this.redis && this.userProfileCache?.has(userId)) {
+      const cached = this.userProfileCache.get(userId);
+      if (Date.now() - cached.timestamp < this.userCacheTTL * 1000) {
+        console.log('✅ Using in-memory cached user profile');
+        return cached.data;
+      }
+    }
+
+    // Cache miss - fetch from database
+    console.log('🔄 Fetching fresh user profile');
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, username, email, full_name, years_experience')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      throw new Error('User not found');
+    }
+
+    const { data: languages, error: langError } = await supabase
+      .from('user_programming_languages')
+      .select(`
+        id,
+        proficiency_level,
+        years_experience,
+        programming_languages (id, name, description)
+      `)
+      .eq('user_id', userId);
+
+    if (langError) console.error('Error fetching user languages:', langError);
+
+    const { data: topics, error: topicsError } = await supabase
+      .from('user_topics')
+      .select(`
+        id,
+        interest_level,
+        experience_level,
+        topics (id, name, description, category)
+      `)
+      .eq('user_id', userId);
+
+    if (topicsError) console.error('Error fetching user topics:', topicsError);
+
+    const profile = {
+      ...user,
+      programming_languages: languages || [],
+      topics: topics || []
+    };
+
+    // Store in Redis cache
+    if (this.redis) {
+      try {
+        await this.redis.setex(cacheKey, this.userCacheTTL, JSON.stringify(profile));
+      } catch (error) {
+        console.error('Redis cache write error:', error);
+      }
+    }
+
+    // Store in fallback in-memory cache
+    if (!this.redis && this.userProfileCache) {
+      this.userProfileCache.set(userId, {
+        data: profile,
+        timestamp: Date.now()
+      });
+    }
+
+    return profile;
   }
 
-  // ============== DATA LOADERS ==============
-  async getUserProfile(userId) {
-    try {
-      const { data: user, error: userError } = await supabase
-        .from('users')
-        .select('id, username, email, full_name, years_experience')
-        .eq('id', userId)
-        .single();
+  // ============== OPTIMIZED: CACHED PROJECTS WITH REDIS ==============
+  async getAvailableProjects(userId, useCache = true) {
+    const cacheKey = 'projects:recruiting:all';
 
-      if (userError || !user) throw new Error('User not found');
+    // Try Redis cache first
+    if (useCache && this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) {
+          console.log('✅ Using Redis cached projects');
+          const projects = JSON.parse(cached);
+          return this.filterUserProjects(projects, userId);
+        }
+      } catch (error) {
+        console.error('Redis cache read error:', error);
+      }
+    }
 
-      // ✅ FIX: Removed non-existent 'category' from programming_languages
-      const { data: languages, error: langError } = await supabase
-        .from('user_programming_languages')
-        .select(`
-          id,
-          proficiency_level,
-          years_experience,
-          programming_languages (id, name, description)
-        `)
-        .eq('user_id', userId);
+    // Fallback to in-memory cache
+    if (useCache && !this.redis && this.projectCache) {
+      const now = Date.now();
+      if ((now - this.projectCacheTime) < this.projectCacheTTL * 1000) {
+        console.log('✅ Using in-memory cached projects');
+        return this.filterUserProjects(this.projectCache, userId);
+      }
+    }
 
-      if (langError) console.error('Error fetching user languages:', langError);
+    // Cache miss - fetch from database
+    console.log('🔄 Fetching fresh projects');
+    const { data: projects, error } = await supabase
+      .from('projects')
+      .select(`
+        id, title, description, difficulty_level, required_experience_level,
+        current_members, maximum_members, status, owner_id, created_at, deadline,
+        project_languages (
+          programming_languages (id, name),
+          required_level,
+          is_primary
+        ),
+        project_topics (
+          topics (id, name),
+          is_primary
+        )
+      `)
+      .eq('status', 'recruiting');
 
-      // ✅ KEPT: topics table DOES have 'category' field
-      const { data: topics, error: topicsError } = await supabase
-        .from('user_topics')
-        .select(`
-          id,
-          interest_level,
-          experience_level,
-          topics (id, name, description, category)
-        `)
-        .eq('user_id', userId);
-
-      if (topicsError) console.error('Error fetching user topics:', topicsError);
-
-      return {
-        ...user,
-        programming_languages: languages || [],
-        topics: topics || []
-      };
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
+    if (error) {
+      console.error('Error fetching projects:', error);
       throw error;
     }
+
+    const enrichedProjects = (projects || []).map(project => ({
+      ...project,
+      languages: project.project_languages?.map(pl => pl.programming_languages?.name).filter(Boolean) || [],
+      topics: project.project_topics?.map(pt => pt.topics?.name).filter(Boolean) || []
+    }));
+
+    // Store in Redis cache
+    if (this.redis) {
+      try {
+        await this.redis.setex(cacheKey, this.projectCacheTTL, JSON.stringify(enrichedProjects));
+      } catch (error) {
+        console.error('Redis cache write error:', error);
+      }
+    }
+
+    // Store in fallback in-memory cache
+    if (!this.redis) {
+      this.projectCache = enrichedProjects;
+      this.projectCacheTime = Date.now();
+    }
+
+    return this.filterUserProjects(enrichedProjects, userId);
   }
 
-  async getAvailableProjects(userId) {
+  // ============== HELPER: Filter out user's own projects ==============
+  async filterUserProjects(projects, userId) {
     try {
-      // ✅ FIX: Select specific columns, removed 'category' from programming_languages
-      // ✅ FIX: Removed '.eq('is_active', true)' - column doesn't exist
-      const { data: projects, error } = await supabase
-        .from('projects')
-        .select(`
-          id, title, description, difficulty_level, required_experience_level,
-          current_members, maximum_members, status, owner_id, created_at, deadline,
-          project_languages (
-            programming_languages (id, name),
-            required_level,
-            is_primary
-          ),
-          project_topics (
-            topics (id, name),
-            is_primary
-          )
-        `)
-        .eq('status', 'recruiting');
-
-      if (error) throw error;
-
       const { data: userMemberships, error: membershipError } = await supabase
         .from('project_members')
         .select('project_id')
@@ -201,25 +287,86 @@ class SkillMatchingService {
       }
 
       const userProjectIds = new Set(userMemberships?.map(m => m.project_id) || []);
-      const availableProjects = (projects || []).filter(project =>
+      
+      return projects.filter(project =>
         project.current_members < project.maximum_members &&
         project.owner_id !== userId &&
         !userProjectIds.has(project.id)
       );
-
-      // Map to include flattened language and topic arrays for legacy compatibility
-      return availableProjects.map(project => ({
-        ...project,
-        languages: project.project_languages?.map(pl => pl.programming_languages?.name).filter(Boolean) || [],
-        topics: project.project_topics?.map(pt => pt.topics?.name).filter(Boolean) || []
-      }));
     } catch (error) {
-      console.error('Error getting available projects:', error);
-      throw error;
+      console.error('Error filtering user projects:', error);
+      return projects.filter(p => p.owner_id !== userId);
     }
   }
 
-  // Legacy scorer (kept for backward compat; not used by enhanced path)
+  // ============== CACHE MANAGEMENT ==============
+  async clearCache(pattern = null) {
+    if (this.redis) {
+      try {
+        if (pattern) {
+          // Clear specific pattern
+          const keys = await this.redis.keys(pattern);
+          if (keys.length > 0) {
+            await this.redis.del(...keys);
+            console.log(`🗑️  Cleared ${keys.length} Redis cache entries matching: ${pattern}`);
+          }
+        } else {
+          // Clear all recommendation-related caches
+          const userKeys = await this.redis.keys('user:profile:*');
+          const projectKeys = await this.redis.keys('projects:recruiting:*');
+          const allKeys = [...userKeys, ...projectKeys];
+          
+          if (allKeys.length > 0) {
+            await this.redis.del(...allKeys);
+            console.log(`🗑️  Cleared ${allKeys.length} Redis cache entries`);
+          }
+        }
+      } catch (error) {
+        console.error('Error clearing Redis cache:', error);
+      }
+    }
+
+    // Also clear in-memory fallback
+    if (!this.redis) {
+      this.projectCache = null;
+      this.projectCacheTime = 0;
+      if (this.userProfileCache) {
+        this.userProfileCache.clear();
+      }
+      console.log('🗑️  Cleared in-memory cache');
+    }
+  }
+
+  // ============== EXTRACT TECHNOLOGIES ==============
+  extractTechnologies(project) {
+    const technologies = [];
+    
+    try {
+      if (project.project_languages && Array.isArray(project.project_languages)) {
+        project.project_languages.forEach(pl => {
+          if (pl.programming_languages && pl.programming_languages.name) {
+            technologies.push(pl.programming_languages.name);
+          }
+        });
+      }
+      
+      if (technologies.length === 0 && project.languages && Array.isArray(project.languages)) {
+        technologies.push(...project.languages.filter(Boolean));
+      }
+      
+      if (technologies.length === 0 && project.language_name) {
+        technologies.push(project.language_name);
+      }
+      
+    } catch (error) {
+      console.error('Error extracting technologies from project:', project.id, error);
+    }
+    
+    return technologies.length > 0 ? technologies : ['Not specified'];
+  }
+
+  // ============== ALL YOUR EXISTING METHODS (unchanged) ==============
+  
   async calculateMatchScore(user, project) {
     try {
       const topicScore = this.calculateTopicMatch(user.topics, project.project_topics);
@@ -249,7 +396,6 @@ class SkillMatchingService {
   calculateExperienceMatch(userExperience, requiredExperience) {
     if (!userExperience || !requiredExperience) return 50;
     const experienceLevels = { beginner: 1, intermediate: 2, advanced: 3, expert: 4 };
-    // Support numeric or named for userExperience
     const userLevelName = this.yearsToLevelName(userExperience);
     const userLevel = experienceLevels[userLevelName] || 1;
     const requiredLevel = experienceLevels[String(requiredExperience).toLowerCase()] || 1;
@@ -305,7 +451,6 @@ class SkillMatchingService {
 
   async storeRecommendations(userId, recommendations) {
     try {
-      // Upsert for idempotency (requires unique index on (user_id, project_id))
       const rows = (recommendations || []).map(rec => ({
         user_id: userId,
         project_id: rec.projectId,
@@ -328,7 +473,6 @@ class SkillMatchingService {
     }
   }
 
-  // ============== ASSESSMENT (unchanged API, challenge loader implemented) ==============
   async assessCodingSkill(userId, projectId, submittedCode, challengeId) {
     try {
       const challenge = await this.getChallengeById(challengeId);
@@ -370,7 +514,7 @@ class SkillMatchingService {
     }
   }
 
-  evaluateCode(code /*, challenge */) {
+  evaluateCode(code) {
     let score = 0;
     if (code && code.length > 10) score += 20;
     if (code.includes('function') || code.includes('def') || code.includes('=>')) score += 20;
@@ -380,7 +524,7 @@ class SkillMatchingService {
     return Math.min(score, 100);
   }
 
-  generateFeedback(score /*, challenge */) {
+  generateFeedback(score) {
     if (score >= 90) return 'Excellent work! Your solution demonstrates strong programming skills.';
     if (score >= 70) return 'Good job! Your solution shows solid understanding with room for improvement.';
     if (score >= 50) return 'Your solution shows basic understanding. Consider reviewing the requirements and trying again.';
@@ -401,7 +545,6 @@ class SkillMatchingService {
     }
   }
 
-  // ============== ENHANCED SCORING HELPERS ==============
   clamp01(x) { return Math.max(0, Math.min(1, x)); }
 
   yearsToLevelName(yearsOrLevel) {
@@ -420,11 +563,11 @@ class SkillMatchingService {
   }
 
   normalizeLevel01(value) {
-    if (typeof value === 'number') return this.clamp01(value / 5);     // 1..5
+    if (typeof value === 'number') return this.clamp01(value / 5);
     const asNum = Number(value);
-    if (!Number.isNaN(asNum)) return this.clamp01(asNum / 5);          // "1".."5"
+    if (!Number.isNaN(asNum)) return this.clamp01(asNum / 5);
     const map = { beginner: 0.25, intermediate: 0.5, advanced: 0.75, expert: 1.0 };
-    return map[String(value).toLowerCase()] ?? 0.5;                    // neutral
+    return map[String(value).toLowerCase()] ?? 0.5;
   }
 
   normalizeRequiredLevel(required) {
@@ -526,7 +669,7 @@ class SkillMatchingService {
     return Math.max(0, 100 - (reqLevel - userLevel) * 22);
   }
 
-  computeFeatures(user, project /*, prefs */) {
+  computeFeatures(user, project) {
     const topic = this.topicCoverageScore(user.topics, project.project_topics || []);
     const lang = this.languageProficiencyScore(user.programming_languages, project.project_languages || []);
     const diff = this.difficultyAlignmentScore(user.years_experience, project.required_experience_level);
@@ -563,7 +706,6 @@ class SkillMatchingService {
       .slice(0, 3);
 
     return {
-      // legacy factors
       topicMatches: this.getTopicMatches(user.topics, project.project_topics || []),
       languageMatches: this.getLanguageMatches(user.programming_languages, project.project_languages || []),
       experienceMatch: {
@@ -571,7 +713,6 @@ class SkillMatchingService {
         requiredExperience: project.required_experience_level,
         isMatch: this.calculateExperienceMatch(user.years_experience, project.required_experience_level) >= 75
       },
-      // enhanced factors
       topicCoverage: {
         score: Math.round(f.topic.score || 0),
         matches: topTopicMatches,

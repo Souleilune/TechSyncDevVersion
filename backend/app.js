@@ -1,14 +1,15 @@
-// backend/app.js - WITH RECOMMENDATIONS ROUTE ADDED
+// backend/app.js - OPTIMIZED VERSION
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const dotenv = require('dotenv');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 
-// Load environment variables
-dotenv.config();
+// Import middleware
+const errorHandler = require('./middleware/errorHandler');
+const { createQueueMiddleware, queueStatsMiddleware, PRIORITY } = require('./middleware/requestQueue');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -26,107 +27,171 @@ const commentsRoutes = require('./routes/comments');
 const notificationsRoutes = require('./routes/notifications');
 const githubRoutes = require('./routes/github');
 const friendsRoutes = require('./routes/friends');
+
 const soloProjectRoutes = require('./routes/soloProjectRoutes');
+
 const awardsRoutes = require('./routes/awards');
 const userProfileUpdateRoutes = require('./routes/userProfileUpdate');
 const collaborativeProjectCompletionRoutes = require('./routes/collaborativeProjectCompletion');
 const usersRoutes = require('./routes/users');
 const timelineRoutes = require('./routes/timeline');
-
-// ✅ NEW: Import recommendations routes
 const recommendationsRoutes = require('./routes/recommendations');
 const coursesRoutes = require('./routes/courses');
 
-// Import middleware
-const errorHandler = require('./middleware/errorHandler');
-
 const app = express();
 
-// Security middleware
+// ============== SECURITY MIDDLEWARE ==============
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false
 }));
 
-// CORS configuration
+// Trust proxy (important for Railway deployment)
+app.set('trust proxy', 1);
+
+// ============== CORS CONFIGURATION ==============
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000',
-    process.env.FRONTEND_URL || 'http://localhost:3000'
-  ],
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'Cache-Control', 
-    'Pragma', 
-    'Expires',
-    'Access-Control-Allow-Origin',
-    'X-Requested-With',
-    'Accept'
-  ],
-  optionsSuccessStatus: 200
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
 
-// Handle preflight requests explicitly
+// Handle preflight requests
 app.options('*', cors());
 
-// Additional CORS headers for stubborn browsers
+// Additional CORS headers
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000',
-    process.env.FRONTEND_URL
-  ];
-  
   if (allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   }
-  
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Expires');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
+  next();
+});
+
+// ============== REQUEST PARSING ==============
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ============== RATE LIMITING ==============
+// General API rate limiter
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Increased from 100
+  message: {
+    success: false,
+    message: 'Too many requests, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limit for health checks
+    return req.path === '/health' || req.path === '/';
+  }
+});
+
+// Strict rate limiter for expensive operations
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: {
+    success: false,
+    message: 'Too many requests for this endpoint, please slow down.'
+  }
+});
+
+// Auth-specific rate limiter (prevent brute force)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  message: {
+    success: false,
+    message: 'Too many login attempts, please try again later.'
+  }
+});
+
+// Apply general rate limiting to all API routes
+app.use('/api/', generalLimiter);
+
+// ============== REQUEST QUEUE MIDDLEWARE ==============
+// Apply queue middleware to prevent server overload
+app.use('/api/recommendations', createQueueMiddleware('recommendations', PRIORITY.LOW));
+app.use('/api/skill-matching', createQueueMiddleware('recommendations', PRIORITY.LOW));
+app.use('/api/chat', createQueueMiddleware('chat', PRIORITY.HIGH));
+app.use('/api/ai-chat', createQueueMiddleware('ai-chat', PRIORITY.NORMAL));
+app.use('/api/projects', createQueueMiddleware('projects', PRIORITY.NORMAL));
+
+// Add queue stats to responses (development only)
+if (process.env.NODE_ENV === 'development') {
+  app.use(queueStatsMiddleware);
+}
+
+// ============== PERFORMANCE MONITORING ==============
+// Log slow requests
+app.use((req, res, next) => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    
+    // Log slow requests (>2 seconds)
+    if (duration > 2000) {
+      console.warn(`⚠️  SLOW REQUEST: ${req.method} ${req.path} took ${duration}ms`);
+    }
+    
+    // Log very slow requests (>5 seconds)
+    if (duration > 5000) {
+      console.error(`🔴 CRITICAL SLOW REQUEST: ${req.method} ${req.path} took ${duration}ms`);
+    }
+  });
   
   next();
 });
 
-// Add no-cache headers for API routes
-app.use('/api', (req, res, next) => {
-  res.set({
-    'Cache-Control': 'no-cache, no-store, must-revalidate',
-    'Pragma': 'no-cache',
-    'Expires': '0'
-  });
-  next();
-});
+// ============== MEMORY MONITORING ==============
+// Monitor memory usage periodically
+if (process.env.NODE_ENV === 'production') {
+  setInterval(() => {
+    const usage = process.memoryUsage();
+    const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(usage.heapTotal / 1024 / 1024);
+    const externalMB = Math.round(usage.external / 1024 / 1024);
+    
+    console.log(`[Memory] Heap: ${heapUsedMB}/${heapTotalMB}MB, External: ${externalMB}MB`);
+    
+    // Warn if memory usage is high
+    if (heapUsedMB > 400) {
+      console.warn(`⚠️  HIGH MEMORY USAGE: ${heapUsedMB}MB`);
+    }
+    
+    // Critical memory warning
+    if (heapUsedMB > 500) {
+      console.error(`🔴 CRITICAL MEMORY USAGE: ${heapUsedMB}MB - Consider restarting`);
+    }
+  }, 60000); // Every minute
+}
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Apply rate limiting to API routes
-app.use('/api/', limiter);
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Logging middleware (development only)
+// ============== LOGGING MIDDLEWARE ==============
 if (process.env.NODE_ENV === 'development') {
   app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
@@ -135,75 +200,78 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-// Test database connection on startup
-const supabase = require('./config/supabase');
+// ============== API ROUTES ==============
 
-// API Routes
+// 1. Critical routes (with authentication rate limiting)
+app.use('/api/auth', authLimiter, authRoutes);
 
-// 1. Independent routes first
-app.use('/api/auth', authRoutes);
+// 2. User routes
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/users', usersRoutes);
-app.use('/api/timeline', timelineRoutes);
-app.use('/api/suggestions', suggestionsRoutes);
-app.use('/api/skill-matching', skillMatchingRoutes);
-app.use('/api/challenges', challengeRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/ai-chat', aiChatRoutes);
-app.use('/api/comments', commentsRoutes);
-app.use('/api/notifications', notificationsRoutes);
-app.use('/api/github', githubRoutes);
-app.use('/api/friends', friendsRoutes);
-app.use('/api/solo-projects', soloProjectRoutes);
-app.use('/api/awards', awardsRoutes);
 app.use('/api/profile-update', userProfileUpdateRoutes);
+app.use('/api/friends', friendsRoutes);
+app.use('/api/awards', awardsRoutes);
+
+// 3. Project routes
 app.use('/api/projects', collaborativeProjectCompletionRoutes);
-
-
-// ✅ NEW: Recommendations route
-app.use('/api/recommendations', recommendationsRoutes);
-app.use('/api/courses', coursesRoutes);
-
-// 2. Project-nested routes
 app.use('/api/projects', taskRoutes);
 app.use('/api/projects', projectMemberRoutes);
-
-// 3. General project routes last
 app.use('/api/projects', projectRoutes);
+app.use('/api/solo-projects', soloProjectRoutes);
 
-// Health check endpoint
+// 4. Interaction routes
+app.use('/api/timeline', timelineRoutes);
+app.use('/api/comments', commentsRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/chat', chatRoutes);
+
+// 5. AI and recommendation routes (with strict rate limiting)
+app.use('/api/ai-chat', aiChatRoutes);
+app.use('/api/suggestions', suggestionsRoutes);
+app.use('/api/skill-matching', strictLimiter, skillMatchingRoutes);
+app.use('/api/recommendations', strictLimiter, recommendationsRoutes);
+app.use('/api/courses', coursesRoutes);
+
+// 6. Feature routes
+app.use('/api/challenges', challengeRoutes);
+app.use('/api/github', githubRoutes);
+
+// 7. Admin routes
+app.use('/api/admin', adminRoutes);
+
+// ============== HEALTH CHECK ==============
 app.get('/health', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Server is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
-});
-
-// Root endpoint with documentation
-app.get('/', (req, res) => {
+  const uptime = process.uptime();
+  const memoryUsage = process.memoryUsage();
+  
   res.json({
     success: true,
-    message: 'Collaboration Platform API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      auth: '/api/auth',
-      projects: '/api/projects',
-      'solo-projects': '/api/solo-projects',
-      tasks: '/api/projects/:projectId/tasks',
-      members: '/api/projects/:projectId/members',
-      'aichat': '/api/ai-chat',
-      challenges: '/api/challenges',
-      github: '/api/github',
-      recommendations: '/api/recommendations' // ✅ NEW: Added to documentation
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    uptime: `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`,
+    memory: {
+      heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+      heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
+      external: `${Math.round(memoryUsage.external / 1024 / 1024)}MB`
     }
   });
 });
 
-// 404 handler for unknown routes
+// ============== ROOT ENDPOINT ==============
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'TechSync API Server',
+    version: '2.0.0',
+    documentation: {
+      health: '/health',
+      endpoints: '/api/*'
+    }
+  });
+});
+
+// ============== 404 HANDLER ==============
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -211,65 +279,80 @@ app.use('*', (req, res) => {
   });
 });
 
-// Error handling middleware (must be last)
+// ============== ERROR HANDLER ==============
 app.use(errorHandler);
 
-// Create HTTP server
+// ============== HTTP SERVER ==============
 const server = createServer(app);
 
-// Setup Socket.IO with CORS
+// ============== SOCKET.IO SETUP ==============
 const io = new Server(server, {
   cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      process.env.FRONTEND_URL || 'http://localhost:3000'
-    ],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   },
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  // Connection limits
+  maxHttpBufferSize: 1e6, // 1MB
+  perMessageDeflate: {
+    threshold: 1024 // Only compress messages > 1KB
+  }
 });
 
-// Setup socket handlers
+// Setup optimized socket handlers
 try {
   const setupSocketHandlers = require('./utils/socketHandler');
   if (typeof setupSocketHandlers === 'function') {
     setupSocketHandlers(io);
   } else {
-    console.log('Socket handler not found or not a function, skipping socket setup');
+    console.log('⚠️  Socket handler not properly exported');
   }
 } catch (error) {
-  console.log('Socket handler file not found, skipping socket setup:', error.message);
+  console.error('❌ Failed to setup socket handlers:', error.message);
 }
 
-// Graceful shutdown handler
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('HTTP server closed.');
-    process.exit(0);
-  });
-});
+// ============== GRACEFUL SHUTDOWN ==============
+let isShuttingDown = false;
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('HTTP server closed.');
-    process.exit(0);
-  });
-});
+const gracefulShutdown = (signal) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
 
-// Handle uncaught exceptions
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+  // Stop accepting new connections
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+  });
+
+  // Close Socket.IO connections
+  io.close(() => {
+    console.log('✅ Socket.IO closed');
+  });
+
+  // Give existing requests 10 seconds to finish
+  setTimeout(() => {
+    console.log('⚠️  Forcing shutdown after timeout');
+    process.exit(0);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// ============== ERROR HANDLERS ==============
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  process.exit(1);
+  console.error('❌ Uncaught Exception:', error);
+  gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't crash on unhandled rejections, just log them
 });
 
-// Export both app and server for use in server.js or testing
-module.exports = { app, server };
+// ============== EXPORTS ==============
+module.exports = { app, server, io };
