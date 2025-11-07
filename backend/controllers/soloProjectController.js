@@ -279,6 +279,7 @@ const verifySoloProjectAccess = async (projectId, userId) => {
 
 const getDashboardData = async (req, res) => {
   try {
+    const startTime = Date.now();
     const { projectId } = req.params;
     const userId = req.user.id;
 
@@ -293,225 +294,179 @@ const getDashboardData = async (req, res) => {
       });
     }
 
-    // FIXED: Fetch complete project data with programming languages and topics
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select(`
-        *,
-        users!owner_id (
-          id,
-          username,
-          full_name,
-          email,
-          avatar_url
-        )
-      `)
-      .eq('id', projectId)
-      .single();
+    // ✅ OPTIMIZATION: Fetch ALL data in parallel with ONE batch
+    const [
+      projectResult,
+      languagesResult,
+      topicsResult,
+      tasksResult,
+      goalsResult,
+      activitiesResult
+    ] = await Promise.all([
+      // Fetch project with owner info
+      supabase
+        .from('projects')
+        .select(`
+          *,
+          users!owner_id (
+            id,
+            username,
+            full_name,
+            email,
+            avatar_url
+          )
+        `)
+        .eq('id', projectId)
+        .single(),
 
-    if (projectError) {
-      console.error('Error fetching complete project data:', projectError);
+      // Fetch project languages
+      supabase
+        .from('project_languages')
+        .select(`
+          *,
+          programming_languages (id, name, description)
+        `)
+        .eq('project_id', projectId),
+
+      // Fetch project topics
+      supabase
+        .from('project_topics')
+        .select(`
+          *,
+          topics (id, name, description, category)
+        `)
+        .eq('project_id', projectId),
+
+      // Fetch ALL tasks at once
+      supabase
+        .from('project_tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false }),
+
+      // Fetch ALL goals at once
+      supabase
+        .from('solo_project_goals')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false }),
+
+      // Fetch recent activities
+      supabase
+        .from('user_activity')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+    ]);
+
+    console.log(`✅ All data fetched in ${Date.now() - startTime}ms`);
+
+    // Handle errors
+    if (projectResult.error) {
+      console.error('Error fetching project:', projectResult.error);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch project data'
       });
     }
 
-    // FIXED: Fetch project languages separately (Supabase join limitation)
-    const { data: projectLanguages, error: languagesError } = await supabase
-      .from('project_languages')
-      .select(`
-        id,
-        is_primary,
-        required_level,
-        programming_languages (
-          id,
-          name,
-          description
-        )
-      `)
-      .eq('project_id', projectId);
+    const project = projectResult.data;
+    const languages = languagesResult.data || [];
+    const topics = topicsResult.data || [];
+    const allTasks = tasksResult.data || [];
+    const allGoals = goalsResult.data || [];
+    const activities = activitiesResult.data || [];
 
-    if (languagesError) {
-      console.error('Error fetching project languages:', languagesError);
-    }
+    // ✅ OPTIMIZATION: Process data in memory (much faster than separate queries)
+    const processingStart = Date.now();
 
-    // FIXED: Fetch project topics separately  
-    const { data: projectTopics, error: topicsError } = await supabase
-      .from('project_topics')
-      .select(`
-        id,
-        is_primary,
-        topics (
-          id,
-          name,
-          description
-        )
-      `)
-      .eq('project_id', projectId);
-
-    if (topicsError) {
-      console.error('Error fetching project topics:', topicsError);
-    }
-
-    // FIXED: Add programming languages and topics to project data
-    project.programming_languages = projectLanguages || [];
-    project.topics = projectTopics || [];
-
-    // FIXED: Get the primary programming language for the challenge system
-    const primaryLanguage = projectLanguages?.find(pl => pl.is_primary);
-    if (primaryLanguage) {
-      project.programming_language_id = primaryLanguage.programming_languages.id;
-      project.programming_language = primaryLanguage.programming_languages;
-    } else if (projectLanguages?.length > 0) {
-      // Fallback to first language if no primary is set
-      project.programming_language_id = projectLanguages[0].programming_languages.id;
-      project.programming_language = projectLanguages[0].programming_languages;
-    }
-
-    console.log('🔧 Project language info:', {
-      languageId: project.programming_language_id,
-      languageName: project.programming_language?.name,
-      totalLanguages: projectLanguages?.length || 0
-    });
-
-    // Fetch project tasks for statistics
-    const { data: allItems, error: itemsError } = await supabase
-      .from('solo_project_goals')
-      .select('*')
-      .eq('project_id', projectId);
-
-    if (itemsError) {
-      console.error('Error fetching items:', itemsError);
-    }
-
-    console.log('📊 Raw items from database:', allItems); // Debug log
-
-    // ✅ Separate tasks from goals based on estimated_hours field
-    const allTasks = (allItems || []).filter(item => 
-      item.estimated_hours !== null && item.estimated_hours > 0
-    );
-    const allGoals = (allItems || []).filter(item => 
-      !item.estimated_hours || item.estimated_hours === null || item.estimated_hours === 0
-    );
-
-    console.log('✅ Tasks found:', allTasks.length); // Debug log
-    console.log('✅ Goals found:', allGoals.length); // Debug log
+    // Enhance project with languages and topics
+    project.programming_languages = languages;
+    project.topics = topics;
 
     // Calculate task statistics
-    const completed = allTasks.filter(task => task.status === 'completed');
-    const inProgress = allTasks.filter(task => task.status === 'in_progress' || task.status === 'active');
-    const completionRate = allTasks.length > 0 ?
-      Math.round((completed.length / allTasks.length) * 100) : 0;
+    const completedTasks = allTasks.filter(t => t.status === 'completed');
+    const inProgressTasks = allTasks.filter(t => t.status === 'in_progress');
+    const todoTasks = allTasks.filter(t => t.status === 'todo');
 
     // Calculate goal statistics
-    const completedGoals = allGoals.filter(goal => goal.status === 'completed');
-    const activeGoals = allGoals.filter(goal => goal.status === 'active' || goal.status === 'in_progress');
+    const completedGoals = allGoals.filter(g => g.status === 'completed');
+    const activeGoals = allGoals.filter(g => g.status === 'active');
 
-    // Get today's time tracking (mock for now - will be implemented with real tracking)
-    // ✅ REAL: Calculate actual time spent today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    // Calculate time tracking
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayActivities = activities.filter(a => {
+      const activityDate = new Date(a.created_at);
+      activityDate.setHours(0, 0, 0, 0);
+      return activityDate.getTime() === today.getTime();
+    });
 
-      // Fetch time tracking entries for today
-      const { data: todayTimeEntries } = await supabase
-        .from('solo_project_time_tracking')
-        .select('duration_minutes')
-        .eq('project_id', projectId)
-        .gte('logged_at', today.toISOString());
+    const timeSpentToday = todayActivities.reduce((sum, activity) => {
+      return sum + (activity.activity_data?.duration_minutes || 0);
+    }, 0);
 
-      // Calculate total hours for today
-      const totalMinutesToday = (todayTimeEntries || []).reduce(
-        (sum, entry) => sum + (entry.duration_minutes || 0), 
-        0
-      );
-      const timeSpentToday = Math.round((totalMinutesToday / 60) * 10) / 10; // Round to 1 decimal
+    // Calculate streak (simplified - count consecutive days with activity)
+    let streakDays = 0;
+    const activityDates = new Set(
+      activities.map(a => {
+        const date = new Date(a.created_at);
+        return date.toISOString().split('T')[0];
+      })
+    );
 
-      // ✅ REAL: Calculate streak days based on activity
-      const { data: recentActivities } = await supabase
-        .from('user_activity')
-        .select('created_at')
-        .eq('project_id', projectId)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      // Calculate consecutive days with activity
-      let streakDays = 0;
-      if (recentActivities && recentActivities.length > 0) {
-        const activityDates = recentActivities.map(a => {
-          const date = new Date(a.created_at);
-          date.setHours(0, 0, 0, 0);
-          return date.getTime();
-        });
-        
-        // Remove duplicates and sort
-        const uniqueDates = [...new Set(activityDates)].sort((a, b) => b - a);
-        
-        // Count consecutive days
-        const todayTime = today.getTime();
-        let currentDate = todayTime;
-        
-        for (let i = 0; i < uniqueDates.length; i++) {
-          if (uniqueDates[i] === currentDate) {
-            streakDays++;
-            currentDate -= 24 * 60 * 60 * 1000; // Go back 1 day
-          } else if (uniqueDates[i] < currentDate) {
-            break; // Streak broken
-          }
-        }
-        
-        // If no activity today, start from yesterday
-        if (uniqueDates[0] < todayTime && streakDays === 0) {
-          currentDate = todayTime - 24 * 60 * 60 * 1000;
-          for (let i = 0; i < uniqueDates.length; i++) {
-            if (uniqueDates[i] === currentDate) {
-              streakDays++;
-              currentDate -= 24 * 60 * 60 * 1000;
-            } else if (uniqueDates[i] < currentDate) {
-              break;
-            }
-          }
-        }
+    let currentDate = new Date();
+    while (true) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      if (activityDates.has(dateStr)) {
+        streakDays++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else {
+        break;
       }
+    }
 
-      console.log('⏱️ Time spent today:', timeSpentToday, 'hours');
-      console.log('🔥 Current streak:', streakDays, 'days');
+    console.log(`✅ Data processed in ${Date.now() - processingStart}ms`);
 
     const dashboardData = {
-      project, // FIXED: Now includes programming languages and topics
+      project,
+      
       stats: {
-        // Existing task stats
         totalTasks: allTasks.length,
-        completedTasks: completed.length,
-        inProgressTasks: inProgress.length,
-        completionRate,
+        completedTasks: completedTasks.length,
+        inProgressTasks: inProgressTasks.length,
+        todoTasks: todoTasks.length,
         
-        // Existing goal stats
         totalGoals: allGoals.length,
         completedGoals: completedGoals.length,
         activeGoals: activeGoals.length,
         
-        // NEW: Unified stats for the enhanced dashboard
-        totalItems: allTasks.length + allGoals.length,  // ← ADD: Combined total
-        completedItems: completed.length + completedGoals.length,  // ← ADD: Combined completed
-        activeItems: inProgress.length + activeGoals.length,  // ← ADD: Combined active
-        combinedCompletionRate: (allTasks.length + allGoals.length) > 0 ?  // ← ADD: Combined completion rate
-          Math.round(((completed.length + completedGoals.length) / (allTasks.length + allGoals.length)) * 100) : 0,
+        taskCompletionRate: allTasks.length > 0
+          ? Math.round((completedTasks.length / allTasks.length) * 100)
+          : 0,
         
-        // Existing time tracking
+        goalCompletionRate: allGoals.length > 0
+          ? Math.round((completedGoals.length / allGoals.length) * 100)
+          : 0,
+        
+        overallCompletionRate: (allTasks.length + allGoals.length) > 0
+          ? Math.round(((completedTasks.length + completedGoals.length) / (allTasks.length + allGoals.length)) * 100)
+          : 0,
+        
         timeSpentToday,
         streakDays
       },
       
-      // NEW: Add the actual tasks and goals data for the dashboard to use
-      tasks: allTasks.slice(0, 10), // ← ADD: Recent tasks for dashboard display
-      goals: allGoals.slice(0, 10)  // ← ADD: Recent goals for dashboard display
+      // Recent tasks and goals for dashboard display
+      tasks: allTasks.slice(0, 10),
+      goals: allGoals.slice(0, 10),
+      recentActivity: activities.slice(0, 10)
     };
 
-    
-
-    console.log('✅ Dashboard data retrieved successfully with programming languages');
+    console.log(`✅ Total dashboard request time: ${Date.now() - startTime}ms`);
 
     res.json({
       success: true,
@@ -522,7 +477,8 @@ const getDashboardData = async (req, res) => {
     console.error('💥 Get dashboard data error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch dashboard data'
+      message: 'Failed to fetch dashboard data',
+      error: error.message
     });
   }
 };
@@ -544,7 +500,7 @@ const getRecentActivity = async (req, res) => {
       });
     }
 
-    // Fetch recent activity from the user_activity table
+    // Single optimized query
     const { data: activities, error: activitiesError } = await supabase
       .from('user_activity')
       .select('*')
@@ -557,22 +513,23 @@ const getRecentActivity = async (req, res) => {
       console.error('Error fetching activities:', activitiesError);
       return res.status(500).json({
         success: false,
-        message: 'Failed to fetch recent activity'
+        message: 'Failed to fetch activities'
       });
     }
 
-    console.log('✅ Recent activity retrieved successfully');
-
     res.json({
       success: true,
-      data: { activities: activities || [] }
+      data: {
+        activities: activities || []
+      }
     });
 
   } catch (error) {
     console.error('💥 Get recent activity error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch recent activity'
+      message: 'Failed to fetch recent activity',
+      error: error.message
     });
   }
 };
