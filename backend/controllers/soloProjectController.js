@@ -26,71 +26,138 @@ const checkAndAwardProgress = async (projectId, userId) => {
 
 const checkProjectCompletionInternal = async (projectId, userId) => {
   try {
-     await supabase
-      .from('projects')
-      .update({ status: 'completed' })
-      .eq('id', projectId);
+    console.log('🎯 Checking solo project completion:', { projectId, userId });
 
-    // ⬇️ CREATE TIMELINE POST
-    await createTimelinePostFromProject(projectId, userId, 'solo');
-    const { data: goals } = await supabase
+    // ✅ STEP 1: Get goals FIRST
+    const { data: goals, error: goalsError } = await supabase
       .from('solo_project_goals')
-      .select('status, progress')
+      .select('id, status, progress')
       .eq('project_id', projectId)
       .eq('user_id', userId);
 
+    if (goalsError) {
+      console.error('Error fetching goals:', goalsError);
+      return { completed: false, awarded: false };
+    }
+
+    // ✅ STEP 2: Calculate completion
     const totalGoals = goals?.length || 0;
     const completedGoals = goals?.filter(g => g.status === 'completed').length || 0;
     const completionPercentage = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
 
-    if (completionPercentage >= 100) {
-      // Check if award already exists
-      const { data: existingAward } = await supabase
-        .from('user_awards')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('project_id', projectId)
-        .eq('award_type', 'project_completion')
-        .single();
+    console.log('📊 Completion stats:', { 
+      totalGoals, 
+      completedGoals, 
+      completionPercentage: completionPercentage.toFixed(2) + '%' 
+    });
 
-      if (!existingAward) {
-        // Get project details
-        const { data: project } = await supabase
-          .from('projects')
-          .select('title')
-          .eq('id', projectId)
-          .single();
-
-        // Create award
-        const { data: newAward } = await supabase
-          .from('user_awards')
-          .insert({
-            user_id: userId,
-            project_id: projectId,
-            award_type: 'project_completion',
-            award_title: '🏆 Project Master',
-            award_description: 'Completed a solo project with 100% progress',
-            award_icon: 'trophy',
-            award_color: '#FFD700',
-            metadata: {
-              completion_percentage: completionPercentage,
-              total_goals: totalGoals,
-              completed_goals: completedGoals,
-              project_title: project?.title
-            }
-          })
-          .select()
-          .single();
-
-        console.log('✅ Project completion award granted!');
-        return { awarded: true, award: newAward };
-      }
+    // ✅ STEP 3: EARLY RETURN if not 100%
+    if (completionPercentage < 100) {
+      console.log('⏳ Project not yet complete, skipping auto-publish');
+      return { completed: false, awarded: false };
     }
 
-    return { awarded: false, completionPercentage };
+    console.log('🎉 Project is 100% complete! Proceeding with completion workflow...');
+
+    // ✅ STEP 4: Check for existing timeline post
+    const { data: existingPost, error: postCheckError } = await supabase
+      .from('timeline_posts')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .maybeSingle();  // ✅ Use maybeSingle() instead of single()
+
+    if (postCheckError) {
+      console.error('Error checking existing timeline post:', postCheckError);
+    }
+
+    // ✅ STEP 5: Create timeline post ONLY if doesn't exist
+    if (!existingPost) {
+      console.log('📝 Creating timeline post for completed project...');
+      const timelinePost = await createTimelinePostFromProject(projectId, userId, 'solo');
+      
+      if (timelinePost) {
+        console.log('✅ Timeline post created successfully:', timelinePost.id);
+      } else {
+        console.warn('⚠️ Failed to create timeline post');
+      }
+    } else {
+      console.log('ℹ️ Timeline post already exists, skipping creation:', existingPost.id);
+    }
+
+    // ✅ STEP 6: Update project status
+    const { error: updateError } = await supabase
+      .from('projects')
+      .update({ 
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', projectId);
+
+    if (updateError) {
+      console.error('Error updating project status:', updateError);
+    } else {
+      console.log('✅ Project status updated to completed');
+    }
+
+    // ✅ STEP 7: Check for existing award
+    const { data: existingAward, error: awardCheckError } = await supabase
+      .from('user_awards')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('project_id', projectId)
+      .eq('award_type', 'project_completion')
+      .maybeSingle();  // ✅ Use maybeSingle()
+
+    if (awardCheckError) {
+      console.error('Error checking existing award:', awardCheckError);
+    }
+
+    // ✅ STEP 8: Create award ONLY if doesn't exist
+    if (!existingAward) {
+      console.log('🏆 Creating project completion award...');
+      
+      const { data: project } = await supabase
+        .from('projects')
+        .select('title')
+        .eq('id', projectId)
+        .single();
+
+      const { data: newAward, error: awardError } = await supabase
+        .from('user_awards')
+        .insert({
+          user_id: userId,
+          project_id: projectId,
+          award_type: 'project_completion',
+          award_title: '🏆 Project Master',
+          award_description: 'Completed a solo project with 100% progress',
+          award_icon: 'trophy',
+          award_color: '#FFD700',
+          metadata: {
+            completion_percentage: completionPercentage,
+            total_goals: totalGoals,
+            completed_goals: completedGoals,
+            project_title: project?.title
+          }
+        })
+        .select()
+        .single();
+
+      if (awardError) {
+        console.error('Error creating award:', awardError);
+      } else {
+        console.log('✅ Project completion award granted:', newAward.id);
+      }
+
+      return { completed: true, awarded: true, award: newAward };
+    } else {
+      console.log('ℹ️ Award already exists, skipping creation:', existingAward.id);
+      return { completed: true, awarded: false };
+    }
+
   } catch (error) {
-    console.error('Error checking project completion:', error);
-    return { awarded: false, error: error.message };
+    console.error('💥 Error in checkProjectCompletionInternal:', error);
+    return { completed: false, awarded: false };
   }
 };
 
@@ -1473,6 +1540,7 @@ const getTimelinePost = async (req, res) => {
     const userId = req.user.id;
 
     console.log('📰 Getting timeline post for project:', projectId);
+    console.log('📰 User ID:', userId);
 
     const accessCheck = await verifySoloProjectAccess(projectId, userId);
     if (!accessCheck.success) {
@@ -1482,12 +1550,16 @@ const getTimelinePost = async (req, res) => {
       });
     }
 
+    // ✅ FIX: Query for ANY timeline post matching this project_id and user_id
+    // Don't filter by post_type since both 'solo_completion' and 'solo_project_start' are valid
     const { data: timelinePost, error } = await supabase
       .from('timeline_posts')
       .select('*')
       .eq('project_id', projectId)
       .eq('user_id', userId)
-      .single();
+      .order('created_at', { ascending: false }) // ✅ Get the most recent one
+      .limit(1)
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching timeline post:', error);
@@ -1495,6 +1567,13 @@ const getTimelinePost = async (req, res) => {
         success: false,
         message: 'Failed to fetch timeline post'
       });
+    }
+
+    console.log('📊 Timeline post found:', timelinePost ? 'YES' : 'NO');
+    if (timelinePost) {
+      console.log('   Post type:', timelinePost.post_type);
+      console.log('   Post ID:', timelinePost.id);
+      console.log('   Completion:', timelinePost.completion_percentage + '%');
     }
 
     res.json({
@@ -1522,7 +1601,6 @@ const publishToTimeline = async (req, res) => {
 
     console.log('📤 Publishing project to timeline:', projectId);
 
-    // Verify solo project access
     const accessCheck = await verifySoloProjectAccess(projectId, userId);
     if (!accessCheck.success) {
       return res.status(accessCheck.statusCode || 404).json({
@@ -1531,22 +1609,22 @@ const publishToTimeline = async (req, res) => {
       });
     }
 
-    // Check if already published
-    const { data: existingPost } = await supabase
+    // ✅ FIX: Check if ANY post exists (not using maybeSingle)
+    const { data: existingPosts } = await supabase
       .from('timeline_posts')
       .select('id')
       .eq('project_id', projectId)
       .eq('user_id', userId)
-      .single();
+      .limit(1);
 
-    if (existingPost) {
+    if (existingPosts && existingPosts.length > 0) {
       return res.status(400).json({
         success: false,
         message: 'Project is already published to timeline'
       });
     }
 
-    // ✅ FIX: Use the helper function to create timeline post with proper completion data
+    // Use the helper function to create timeline post
     const { createTimelinePostFromProject } = require('../utils/timelinePostHelper');
     const timelinePost = await createTimelinePostFromProject(projectId, userId, 'solo');
 
@@ -1733,8 +1811,4 @@ module.exports = {
   publishToTimeline,
   updateTimelinePost,
   deleteTimelinePost,
-
-  checkAndAwardProgress,
-  checkProjectCompletionInternal,
-  checkWeeklyChallengeInternal
 };
