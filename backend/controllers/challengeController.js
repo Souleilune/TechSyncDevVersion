@@ -650,21 +650,23 @@ const submitSimpleChallenge = async (req, res) => {
 
     // ===== CREATE ATTEMPT RECORD =====
     const { data: attempt, error: attemptError } = await supabase
-      .from('challenge_attempts')
-      .insert({
-        user_id: userId,
-        challenge_id: challenge_id,
-        project_id: project_id || null,
-        submitted_code: submitted_code,
-        score: score,
-        status: status,
-        feedback: feedback,
-        submitted_at: new Date(),
-        completed_at: new Date(),
-        notes: notes || null
-      })
-      .select()
-      .single();
+    .from('challenge_attempts')
+    .insert({
+      user_id: userId,
+      challenge_id: challenge_id,
+      project_id: project_id || null,
+      submitted_code,
+      status, // 'passed' or 'completed'
+      score,
+      feedback,
+      results: null, // Using 'results' instead of 'test_results'
+      started_at: new Date().toISOString(),
+      submitted_at: new Date().toISOString(),
+      reviewed_at: new Date().toISOString(),
+      solve_time_minutes: 0
+    })
+    .select()
+    .single();
 
     if (attemptError) {
       console.error('❌ Error creating attempt:', attemptError);

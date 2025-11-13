@@ -1,4 +1,4 @@
-// backend/app.js - OPTIMIZED VERSION
+// backend/app.js - OPTIMIZED VERSION WITH FIXED CORS
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -49,20 +49,40 @@ app.use(helmet({
 // Trust proxy (important for Railway deployment)
 app.set('trust proxy', 1);
 
-// ============== CORS CONFIGURATION ==============
+// ============== CORS CONFIGURATION - FIXED ==============
 const allowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
+// ✅ FIXED CORS - Allow requests with no origin (proxy requests)
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // ✅ Allow requests with no origin (proxy, Postman, mobile apps)
+    if (!origin) {
+      return callback(null, true);
     }
+    
+    // Allow explicitly allowed origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // ✅ In development, allow all localhost origins
+    if (process.env.NODE_ENV !== 'production') {
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+    }
+    
+    // Reject in production only
+    if (process.env.NODE_ENV === 'production') {
+      return callback(new Error('Not allowed by CORS'));
+    }
+    
+    // Allow in development
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
