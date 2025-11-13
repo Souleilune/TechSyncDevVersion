@@ -1,4 +1,4 @@
-// frontend/src/contexts/ChatContext.js
+// frontend/src/contexts/ChatContext.js - MINIMAL FIX with Enhanced Debugging
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from './AuthContext';
@@ -28,29 +28,50 @@ export const ChatProvider = ({ children }) => {
   // Initialize socket connection
   useEffect(() => {
     if (user && token) {
-      const socketInstance = io(process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000', {
+      // Socket URL - works with your current Vercel env
+      const socketUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+      
+      console.log('🔌 [SOCKET] Connecting to:', socketUrl);
+      console.log('🔌 [SOCKET] User:', user.username);
+      
+      const socketInstance = io(socketUrl, {
         auth: { token },
-        transports: ['websocket', 'polling']
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5
       });
 
       socketInstance.on('connect', () => {
-        console.log('Connected to chat server');
+        console.log('✅ [SOCKET] Connected! ID:', socketInstance.id);
         setConnected(true);
       });
 
-      socketInstance.on('disconnect', () => {
-        console.log('Disconnected from chat server');
+      socketInstance.on('disconnect', (reason) => {
+        console.log('❌ [SOCKET] Disconnected. Reason:', reason);
         setConnected(false);
       });
 
       socketInstance.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
+        console.error('❌ [SOCKET] Connection error:', error.message);
         setConnected(false);
       });
 
-      // Handle new messages
+      // Handle new messages FROM OTHER USERS
       socketInstance.on('new_message', (data) => {
         const { message, roomId } = data;
+        console.log('📩 [SOCKET] new_message (from other):', { roomId, messageId: message.id, from: message.user?.username });
+        setMessages(prev => ({
+          ...prev,
+          [roomId]: [...(prev[roomId] || []), message]
+        }));
+      });
+
+      // ✅ Handle message_sent confirmation FOR SENDER'S OWN MESSAGE
+      socketInstance.on('message_sent', (data) => {
+        const { message, roomId } = data;
+        console.log('✅ [SOCKET] message_sent (own message):', { roomId, messageId: message.id });
         setMessages(prev => ({
           ...prev,
           [roomId]: [...(prev[roomId] || []), message]
@@ -60,6 +81,7 @@ export const ChatProvider = ({ children }) => {
       // Handle message edits
       socketInstance.on('message_edited', (data) => {
         const { message, roomId } = data;
+        console.log('✏️ [SOCKET] message_edited:', { roomId, messageId: message.id });
         setMessages(prev => ({
           ...prev,
           [roomId]: prev[roomId]?.map(msg => 
@@ -71,6 +93,7 @@ export const ChatProvider = ({ children }) => {
       // Handle message deletions
       socketInstance.on('message_deleted', (data) => {
         const { messageId, roomId } = data;
+        console.log('🗑️ [SOCKET] message_deleted:', { roomId, messageId });
         setMessages(prev => ({
           ...prev,
           [roomId]: prev[roomId]?.filter(msg => msg.id !== messageId) || []
@@ -105,10 +128,12 @@ export const ChatProvider = ({ children }) => {
 
       // Handle online users
       socketInstance.on('online_users', (data) => {
+        console.log('👥 [SOCKET] online_users:', data.users?.length || 0);
         setOnlineUsers(data.users);
       });
 
       socketInstance.on('user_online', (data) => {
+        console.log('🟢 [SOCKET] user_online:', data.user?.username);
         setOnlineUsers(prev => {
           const exists = prev.some(u => u.id === data.user.id);
           return exists ? prev : [...prev, data.user];
@@ -116,17 +141,24 @@ export const ChatProvider = ({ children }) => {
       });
 
       socketInstance.on('user_offline', (data) => {
+        console.log('🔴 [SOCKET] user_offline:', data.userId);
         setOnlineUsers(prev => prev.filter(u => u.id !== data.userId));
       });
 
       // Handle errors
       socketInstance.on('error', (data) => {
-        console.error('Chat error:', data.message);
+        console.error('❌ [SOCKET] error event:', data.message);
+      });
+
+      // ✅ NEW: Listen for rooms_joined confirmation
+      socketInstance.on('rooms_joined', (data) => {
+        console.log('✅ [SOCKET] rooms_joined:', data);
       });
 
       setSocket(socketInstance);
 
       return () => {
+        console.log('🔌 [SOCKET] Cleaning up connection');
         socketInstance.disconnect();
       };
     }
@@ -135,29 +167,57 @@ export const ChatProvider = ({ children }) => {
   // Join project rooms (only for projects user is member of)
   const joinProjectRooms = useCallback((projectId) => {
     if (socket && connected) {
+      console.log('📍 [SOCKET] Joining project rooms for:', projectId);
       socket.emit('join_project_rooms', projectId);
       socket.emit('user_online', { projectId });
       socket.emit('get_online_users', { projectId });
       setCurrentProject(projectId);
+    } else {
+      console.error('❌ [SOCKET] Cannot join rooms. Socket:', !!socket, 'Connected:', connected);
     }
   }, [socket, connected]);
 
   // Send message (only to project members)
   const sendMessage = useCallback((roomId, content, messageType = 'text', replyToMessageId = null) => {
-    if (socket && connected && currentProject) {
-      socket.emit('send_message', {
-        roomId,
-        projectId: currentProject,
-        content,
-        messageType,
-        replyToMessageId
-      });
+    if (!socket) {
+      console.error('❌ [SEND_MESSAGE] No socket instance!');
+      return;
     }
+    if (!connected) {
+      console.error('❌ [SEND_MESSAGE] Socket not connected!');
+      return;
+    }
+    if (!currentProject) {
+      console.error('❌ [SEND_MESSAGE] No current project set!');
+      return;
+    }
+
+    const messageData = {
+      roomId,
+      projectId: currentProject,
+      content,
+      messageType,
+      replyToMessageId
+    };
+
+    console.log('📤 [SEND_MESSAGE] Emitting:', {
+      ...messageData,
+      content: content.substring(0, 50) + '...',
+      socketId: socket.id
+    });
+
+    // ✅ CRITICAL: Emit the event
+    socket.emit('send_message', messageData);
+
+    // Log to confirm emit was called
+    console.log('✅ [SEND_MESSAGE] Event emitted successfully');
+
   }, [socket, connected, currentProject]);
 
   // Edit message
   const editMessage = useCallback((messageId, content) => {
     if (socket && connected) {
+      console.log('✏️ [EDIT_MESSAGE] Emitting:', messageId);
       socket.emit('edit_message', { messageId, content });
     }
   }, [socket, connected]);
@@ -165,6 +225,7 @@ export const ChatProvider = ({ children }) => {
   // Delete message
   const deleteMessage = useCallback((messageId) => {
     if (socket && connected) {
+      console.log('🗑️ [DELETE_MESSAGE] Emitting:', messageId);
       socket.emit('delete_message', { messageId });
     }
   }, [socket, connected]);
@@ -196,6 +257,7 @@ export const ChatProvider = ({ children }) => {
       const data = await response.json();
       
       if (data.success) {
+        console.log('📋 [FETCH_ROOMS] Got rooms:', data.data.length);
         setChatRooms(data.data);
         // Set first room as active if none selected
         if (data.data.length > 0 && !activeRoom) {
@@ -205,7 +267,7 @@ export const ChatProvider = ({ children }) => {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('Error fetching chat rooms:', error);
+      console.error('❌ [FETCH_ROOMS] Error:', error);
     } finally {
       setLoading(false);
     }
@@ -227,16 +289,19 @@ export const ChatProvider = ({ children }) => {
       const data = await response.json();
       
       if (data.success) {
+        console.log('📨 [FETCH_MESSAGES] Got messages:', data.data.messages.length);
         setMessages(prev => ({
           ...prev,
-          [roomId]: page === 1 ? data.data.messages : [...data.data.messages, ...(prev[roomId] || [])]
+          [roomId]: page === 1 ? 
+            data.data.messages : 
+            [...data.data.messages, ...(prev[roomId] || [])]
         }));
         return data.data.pagination;
       } else {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error('❌ [FETCH_MESSAGES] Error:', error);
       return null;
     }
   }, [token]);
@@ -260,19 +325,21 @@ export const ChatProvider = ({ children }) => {
       const data = await response.json();
       
       if (data.success) {
+        console.log('➕ [CREATE_ROOM] Created:', data.data.name);
         setChatRooms(prev => [...prev, data.data]);
         return data.data;
       } else {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('Error creating chat room:', error);
+      console.error('❌ [CREATE_ROOM] Error:', error);
       return null;
     }
   }, [token]);
 
   // Clear messages when changing projects
   const clearMessages = useCallback(() => {
+    console.log('🧹 [CLEAR] Clearing all messages and state');
     setMessages({});
     setActiveRoom(null);
     setChatRooms([]);

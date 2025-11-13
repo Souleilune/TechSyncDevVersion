@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { authService } from '../services/authService';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Eye, EyeOff, Home, LogIn, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -112,6 +113,8 @@ function Login() {
   const [validationErrors, setValidationErrors] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameCheckTimer, setUsernameCheckTimer] = useState(null);
 
   const { login, register, loading, error, isAuthenticated, clearError } = useAuth();
   const navigate = useNavigate();
@@ -169,6 +172,39 @@ function Login() {
     }
     return null;
   };
+
+  const checkUsernameAvailability = useCallback(async (username) => {
+  if (!username || username.length < 3) {
+    return;
+  }
+
+  // Client-side validation first
+  const usernameError = validateUsername(username);
+  if (usernameError) {
+    return;
+  }
+
+  try {
+    setCheckingUsername(true);
+    const result = await authService.checkUsername(username);
+    
+    if (result.success && !result.available) {
+      setValidationErrors(prev => ({
+        ...prev,
+        username: 'Username already in used'
+      }));
+    } else if (result.success && result.available) {
+      setValidationErrors(prev => {
+        const { username, ...rest } = prev;
+        return rest;
+      });
+    }
+  } catch (error) {
+    console.error('Username check error:', error);
+  } finally {
+    setCheckingUsername(false);
+  }
+}, []);
 
   const validatePassword = (password) => {
     if (!password) return 'Password is required';
@@ -357,20 +393,35 @@ function Login() {
   };
 
   const handleRegisterChange = (e) => {
-    const { name, value } = e.target;
-    setRegisterData({
-      ...registerData,
-      [name]: value
-    });
-    
-    if (validationErrors[name]) {
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
+  const { name, value } = e.target;
+  setRegisterData(prev => ({
+    ...prev,
+    [name]: value
+  }));
+
+  // Real-time username availability check with debounce
+  if (name === 'username') {
+    // Clear previous timer
+    if (usernameCheckTimer) {
+      clearTimeout(usernameCheckTimer);
+    }
+
+    // Set new timer for 500ms delay
+    const timer = setTimeout(() => {
+      checkUsernameAvailability(value);
+    }, 500);
+
+    setUsernameCheckTimer(timer);
+  }
+};
+
+useEffect(() => {
+  return () => {
+    if (usernameCheckTimer) {
+      clearTimeout(usernameCheckTimer);
     }
   };
+}, [usernameCheckTimer]);
 
   // Memoize styles WITHOUT any dynamic values
   const styles = useMemo(() => ({

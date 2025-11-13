@@ -111,7 +111,8 @@ const register = async (req, res) => {
       } else if (existingUser.username === username) {
         return res.status(400).json({
           success: false,
-          message: 'This username is already taken'
+          message: 'Username already in used',
+          errors: { username: 'Username already in used' }
         });
       } else if (existingUser.email === email) {
         return res.status(400).json({
@@ -253,6 +254,48 @@ const register = async (req, res) => {
       success: false,
       message: 'Internal server error',
       error: error.message
+    });
+  }
+};
+
+// Check if username is available (for real-time validation)
+const checkUsernameAvailability = async (req, res) => {
+  try {
+    const { username } = req.query;
+
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username is required'
+      });
+    }
+
+    // Check if username exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username.trim())
+      .single();
+
+    if (existingUser) {
+      return res.json({
+        success: true,
+        available: false,
+        message: 'Username already in used'
+      });
+    }
+
+    return res.json({
+      success: true,
+      available: true,
+      message: 'Username is available'
+    });
+
+  } catch (error) {
+    console.error('Check username availability error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check username availability'
     });
   }
 };
@@ -796,5 +839,6 @@ module.exports = {
   changePassword,
   logout,
   requestPasswordReset,
-  resetPassword  
+  resetPassword,
+  checkUsernameAvailability
 };

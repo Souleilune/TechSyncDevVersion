@@ -187,114 +187,130 @@ const setupSocketHandlers = (io) => {
     const messageTimestamps = [];
 
     socket.on('send_message', async (data) => {
-      try {
-        // Rate limiting check
-        const now = Date.now();
-        const oneMinuteAgo = now - 60000;
-        const recentMessages = messageTimestamps.filter(t => t > oneMinuteAgo);
-        
-        if (recentMessages.length >= MESSAGE_RATE_LIMIT) {
-          socket.emit('error', { message: 'Message rate limit exceeded' });
-          return;
-        }
-        
-        messageTimestamps.push(now);
-        // Clean old timestamps to prevent memory leak
-        while (messageTimestamps.length > 0 && messageTimestamps[0] < oneMinuteAgo) {
-          messageTimestamps.shift();
-        }
+  try {
+    // Rate limiting check
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    const recentMessages = messageTimestamps.filter(t => t > oneMinuteAgo);
+    
+    if (recentMessages.length >= MESSAGE_RATE_LIMIT) {
+      socket.emit('error', { message: 'Message rate limit exceeded' });
+      return;
+    }
+    
+    messageTimestamps.push(now);
+    // Clean old timestamps to prevent memory leak
+    while (messageTimestamps.length > 0 && messageTimestamps[0] < oneMinuteAgo) {
+      messageTimestamps.shift();
+    }
 
-        const { roomId, projectId, content, messageType = 'text', replyToMessageId = null } = data;
+    const { roomId, projectId, content, messageType = 'text', replyToMessageId = null } = data;
 
-        // Validate input
-        if (!roomId || !content || content.trim().length === 0) {
-          socket.emit('error', { message: 'Invalid message data' });
-          return;
-        }
+    // Validate input
+    if (!roomId || !content || content.trim().length === 0) {
+      socket.emit('error', { message: 'Invalid message data' });
+      return;
+    }
 
-        // Limit message length to prevent memory issues
-        const MAX_MESSAGE_LENGTH = 5000;
-        const trimmedContent = content.slice(0, MAX_MESSAGE_LENGTH);
+    // Limit message length to prevent memory issues
+    const MAX_MESSAGE_LENGTH = 5000;
+    const trimmedContent = content.slice(0, MAX_MESSAGE_LENGTH);
 
-        // Verify room membership
-        const { data: room, error: roomError } = await supabase
-          .from('chat_rooms')
-          .select('project_id')
-          .eq('id', roomId)
-          .single();
+    // Verify room membership
+    const { data: room, error: roomError } = await supabase
+      .from('chat_rooms')
+      .select('project_id')
+      .eq('id', roomId)
+      .single();
 
-        if (roomError || !room) {
-          socket.emit('error', { message: 'Chat room not found' });
-          return;
-        }
+    if (roomError || !room) {
+      socket.emit('error', { message: 'Chat room not found' });
+      return;
+    }
 
-        // Verify project membership
-        const { data: membership } = await supabase
-          .from('project_members')
-          .select('id')
-          .eq('project_id', room.project_id)
-          .eq('user_id', socket.userId)
-          .single();
+    // Verify project membership
+    const { data: membership } = await supabase
+      .from('project_members')
+      .select('id')
+      .eq('project_id', room.project_id)
+      .eq('user_id', socket.userId)
+      .single();
 
-        if (!membership) {
-          socket.emit('error', { message: 'Not a project member' });
-          return;
-        }
+    if (!membership) {
+      socket.emit('error', { message: 'Not a project member' });
+      return;
+    }
 
-        // Insert message
-        const { data: newMessage, error: insertError } = await supabase
-          .from('chat_messages')
-          .insert({
-            room_id: roomId,
-            user_id: socket.userId,
-            message_type: messageType,
-            content: trimmedContent,
-            reply_to_message_id: replyToMessageId
-          })
-          .select(`
-            *,
-            users!inner(id, username, full_name, avatar_url)
-          `)
-          .single();
+    // Insert message
+    const { data: newMessage, error: insertError } = await supabase
+      .from('chat_messages')
+      .insert({
+        room_id: roomId,
+        user_id: socket.userId,
+        message_type: messageType,
+        content: trimmedContent,
+        reply_to_message_id: replyToMessageId
+      })
+      .select(`
+        *,
+        users!inner(id, username, full_name, avatar_url)
+      `)
+      .single();
 
-        if (insertError) {
-          console.error('[send_message] Insert error:', insertError);
-          socket.emit('error', { message: 'Failed to send message' });
-          return;
-        }
+    if (insertError) {
+      console.error('[send_message] Insert error:', insertError);
+      socket.emit('error', { message: 'Failed to send message' });
+      return;
+    }
 
-        // Process message (add reply data if needed)
-        const processedMessage = { ...newMessage };
-        if (replyToMessageId) {
-          const { data: replyToMessage } = await supabase
-            .from('chat_messages')
-            .select('*, users!inner(id, username, full_name, avatar_url)')
-            .eq('id', replyToMessageId)
-            .single();
+    // ✅ FIX: Format the message properly - convert users array to user object
+    const processedMessage = {
+      ...newMessage,
+      user: Array.isArray(newMessage.users) ? newMessage.users[0] : newMessage.users
+    };
+    
+    // Remove the users array to avoid confusion
+    delete processedMessage.users;
 
-          if (replyToMessage) {
-            processedMessage.reply_to = replyToMessage;
-          }
-        }
+    // Add reply data if needed
+    if (replyToMessageId) {
+      const { data: replyToMessage } = await supabase
+        .from('chat_messages')
+        .select('*, users!inner(id, username, full_name, avatar_url)')
+        .eq('id', replyToMessageId)
+        .single();
 
-        // Broadcast to room (not back to sender)
-        socket.to(`room_${roomId}`).emit('new_message', {
-          message: processedMessage,
-          roomId,
-          projectId: room.project_id
-        });
-
-        // Send confirmation to sender
-        socket.emit('message_sent', {
-          message: processedMessage,
-          roomId
-        });
-
-      } catch (error) {
-        console.error('[send_message] Error:', error);
-        socket.emit('error', { message: 'Failed to send message' });
+      if (replyToMessage) {
+        // ✅ FIX: Format reply message too
+        processedMessage.reply_to = {
+          ...replyToMessage,
+          user: Array.isArray(replyToMessage.users) ? replyToMessage.users[0] : replyToMessage.users
+        };
+        delete processedMessage.reply_to.users;
       }
+    }
+
+    // Broadcast to room (not back to sender)
+    socket.to(`room_${roomId}`).emit('new_message', {
+      message: processedMessage,
+      roomId,
+      projectId: room.project_id
     });
+
+    // Send confirmation to sender
+    socket.emit('message_sent', {
+      message: processedMessage,
+      roomId
+    });
+
+    console.log('[send_message] Message sent successfully:', processedMessage.id);
+
+  } catch (error) {
+    console.error('[send_message] Error:', error);
+    socket.emit('error', { message: 'Failed to send message' });
+  }
+});
+  
 
     // ============== TYPING INDICATORS (DEBOUNCED) ==============
     const typingTimeouts = new Map();

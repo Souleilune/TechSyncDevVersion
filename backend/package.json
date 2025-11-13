@@ -14,7 +14,8 @@
     "check:db": "node scripts/checkDatabaseStats.js",
     "paper:separate-tables": "node scripts/testRecommendationScalability_SeparateTables.js",
     "rejection:confusion": "node scripts/testRejectionLearningConfusionMatrix.js",
-    "test:chatbot": "node scripts/testAIChatbotPerformance.js"
+    "test:chatbot": "node scripts/testAIChatbotPerformance.js",
+    "scalability:formula": "node scripts/testRecommendationScalability_WithFormulas.js"
   },
   "keywords": [],
   "author": "",

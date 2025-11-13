@@ -5,6 +5,7 @@ import ChallengeFailureAlert from './ChallengeFailureAlert';
 import TestResultsPanel from './TestResultsPanel';
 import ChallengeHints from './ChallengeHints';
 import { projectService } from '../services/projectService';
+import { Lightbulb, Code2, FileText, TestTube2, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 
 const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
   const navigate = useNavigate();
@@ -991,7 +992,10 @@ const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
 
             {/* Description */}
             <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>📋 Challenge Description</h3>
+              <h3 style={styles.sectionTitle}>
+                <FileText size={18} />
+                Challenge Description
+              </h3>
               <div style={styles.descriptionBox}>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
                   {challenge.challenge?.description || 'No description available.'}
@@ -1007,7 +1011,10 @@ const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
             {/* Test Cases */}
             {challenge.challenge?.test_cases && (
               <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>🧪 Test Cases</h3>
+                <h3 style={styles.sectionTitle}>
+                  <TestTube2 size={18} />
+                  Test Cases
+                </h3>
                 <div style={styles.testCasesBox}>
                   <pre style={{ margin: 0, fontSize: '13px', fontFamily: 'Monaco, Consolas, monospace' }}>
                     {typeof challenge.challenge.test_cases === 'string'
@@ -1030,8 +1037,9 @@ const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
                   e.target.style.color = '#60a5fa';
                 }}
               >
-                💡 {showHints ? 'Hide' : 'Show'} Hints
-                <span>{showHints ? '▲' : '▼'}</span>
+                <Lightbulb size={16} />
+                {showHints ? 'Hide' : 'Show'} Hints
+                {showHints ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
               {showHints && (
                 <div style={styles.hintContent}>
@@ -1050,7 +1058,10 @@ const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
 
             {/* Code Editor */}
             <div style={{ ...styles.section, position: 'relative' }}>
-              <h3 style={styles.sectionTitle}>💻 Your Solution</h3>
+              <h3 style={styles.sectionTitle}>
+                <Code2 size={18} />
+                Your Solution
+              </h3>
               <div style={{ position: 'relative' }}>
                 <textarea
                   value={submittedCode}
@@ -1082,7 +1093,7 @@ const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
                 {!startedAt && (
                   <div style={styles.disabledOverlay}>
                     <div style={styles.disabledMessage}>
-                      <span style={{ fontSize: '24px', marginBottom: '8px' }}>🔒</span>
+                      <Lock size={32} style={{ marginBottom: '8px', color: '#9ca3af' }} />
                       <p>Start the challenge to begin coding</p>
                     </div>
                   </div>
@@ -1274,7 +1285,7 @@ const ProjectChallengeInterface = ({ projectId, onClose, onSuccess }) => {
                       }
                     }}
                   >
-                    🚀 Start Challenge
+                    Start Challenge
                   </button>
                 </>
               )}

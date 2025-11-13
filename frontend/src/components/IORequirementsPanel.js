@@ -1,4 +1,5 @@
 import React from 'react';
+import { FileInput, FileOutput, AlertCircle } from 'lucide-react';
 import LanguageTips from './ChallengeHints';
 
 function normalizeTestCases(raw) {
@@ -9,6 +10,7 @@ function normalizeTestCases(raw) {
   if (t && typeof t === 'object') return [t];
   return [];
 }
+
 function tryParseJSON(s) {
   try {
     const v = typeof s === 'string' ? JSON.parse(s) : s;
@@ -28,43 +30,91 @@ export default function IORequirementsPanel({ rawTestCases, forgiving = true, nu
   const isJsonOutput = expJson.ok;
   const expectedKeys = isJsonOutput ? Object.keys(expJson.value) : [];
 
-  const box = { marginTop: 16, padding: 16, border: '1px solid #e9ecef', borderRadius: 8, background: '#fff' };
-  const title = { fontWeight: 700, margin: '0 0 8px 0', color: '#333' };
-  const note = { fontSize: 13, color: '#555', margin: '4px 0' };
-  const mono = { fontFamily: 'Monaco, Consolas, monospace', fontSize: 13, whiteSpace: 'pre-wrap', background: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: 6, padding: 10, marginTop: 6 };
+  const box = { 
+    marginTop: 16, 
+    padding: 16, 
+    border: '2px solid rgba(59, 130, 246, 0.3)', 
+    borderRadius: 12, 
+    background: 'linear-gradient(135deg, rgba(15, 17, 22, 0.95), rgba(26, 28, 32, 0.90))',
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+  };
+  
+  const title = { 
+    fontWeight: 700, 
+    margin: '0 0 8px 0', 
+    color: '#e2e8f0',
+    fontSize: 18,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  };
+  
+  const note = { 
+    fontSize: 13, 
+    color: '#94a3b8', 
+    margin: '4px 0' 
+  };
+  
+  const mono = { 
+    fontFamily: 'Monaco, Consolas, monospace', 
+    fontSize: 13, 
+    whiteSpace: 'pre-wrap', 
+    background: 'rgba(0, 0, 0, 0.4)', 
+    border: '1px solid rgba(255, 255, 255, 0.15)', 
+    borderRadius: 8, 
+    padding: 12, 
+    marginTop: 8,
+    color: '#e2e8f0',
+    overflowX: 'auto'
+  };
+
+  const sectionTitle = {
+    marginTop: 12,
+    color: '#e2e8f0',
+    fontWeight: 600,
+    fontSize: 15,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px'
+  };
 
   return (
     <div style={box}>
-      <div style={title}>📥 I/O Requirements</div>
+      <div style={title}>
+        <FileInput size={18} />
+        I/O Requirements
+      </div>
       <div style={note}>Your program is executed once per test case. It should:</div>
-      <ul style={{ margin: '6px 0 12px 18px', color: '#444', fontSize: 13 }}>
+      <ul style={{ margin: '6px 0 12px 18px', color: '#cbd5e1', fontSize: 13, lineHeight: 1.8 }}>
         <li>Read input from STDIN.</li>
         {isJsonOutput
           ? <li>Print exactly one JSON object to STDOUT (no extra logs).</li>
           : <li>Print exactly one line to STDOUT matching the expected output.</li>
         }
         {forgiving && isJsonOutput && <li>JSON whitespace and key order are ignored by the checker.</li>}
-        {forgiving && isJsonOutput && numericToleranceHint && <li>Numeric values may allow a small tolerance.</li>}
+        {forgiving && isJsonOutput && numericToleranceHint && (
+          <li style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <AlertCircle size={14} />
+            Numeric values may allow a small tolerance.
+          </li>
+        )}
       </ul>
 
-      <div style={{ marginTop: 8, color: '#333', fontWeight: 600 }}>Example input (stdin)</div>
+      <div style={sectionTitle}>
+        <FileInput size={16} />
+        Example input (stdin)
+      </div>
       <pre style={mono}>{inputExample}</pre>
 
-      <div style={{ marginTop: 8, color: '#333', fontWeight: 600 }}>
-        Expected output {isJsonOutput ? '(JSON object)' : ''}
+      <div style={sectionTitle}>
+        <FileOutput size={16} />
+        Expected output {isJsonOutput ? 'schema' : 'format'}
       </div>
-      <pre style={mono}>{expectedStr}</pre>
-
-      {isJsonOutput && expectedKeys.length > 0 && (
-        <>
-          <div style={{ marginTop: 8, fontWeight: 600, color: '#333' }}>
-            Required JSON keys: {expectedKeys.join(', ')}
-          </div>
-        </>
-      )}
-
-      {/* Language-specific tips/snippet */}
-      <LanguageTips languageName={languageName} expectedKeys={expectedKeys} />
+      <pre style={mono}>{isJsonOutput && expectedKeys.length 
+        ? `{ ${expectedKeys.map(k => `"${k}": <value>`).join(', ')} }` 
+        : expectedStr}
+      </pre>
     </div>
   );
 }

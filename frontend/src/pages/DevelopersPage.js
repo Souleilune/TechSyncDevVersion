@@ -41,7 +41,7 @@ const DevelopersPage = () => {
       name: "Virgil D. Barcelon",
       role: "Full-Stack Developer",
       bio: "Passionate about creating seamless user experiences and robust backend systems. Specializes in React, Node.js, and cloud architecture.",
-      image: "/images/developers/developer1.png",
+      image: "/images/developers/developer3.png",
       skills: ["React", "Node.js", "TypeScript", "PostgreSQL", "AWS", "Docker"],
       social: {
         github: "https://github.com/Souleilune",

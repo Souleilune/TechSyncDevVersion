@@ -10,6 +10,7 @@ const api = axios.create({
   }
 });
 
+
 // Add token to requests
 const setAuthToken = (token) => {
   if (token) {
@@ -53,6 +54,12 @@ export const authService = {
   changePassword: async (passwords, token) => {
     setAuthToken(token);
     const response = await api.put('/auth/change-password', passwords);
+    return response.data;
+  },
+
+  // Check username availability
+  checkUsername: async (username) => {
+    const response = await api.get(`/auth/check-username?username=${encodeURIComponent(username)}`);
     return response.data;
   },
 

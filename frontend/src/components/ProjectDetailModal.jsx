@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, Clock, TrendingUp, Code, Target, Calendar, Lock, Sparkles, User } from 'lucide-react';
 import api from '../services/api';
+import ExpandableMatchSummary from './ExpandableMatchSummary';
 
 const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
   const [isJoining, setIsJoining] = useState(false);
@@ -141,25 +142,12 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onJoin, isLocked }) => {
             </button>
           </div>
           
-          {/* Match Score Banner */}
-          <div style={styles.matchBanner}>
-            <div style={styles.matchScore}>
-              <Sparkles size={20} />
-              <span style={styles.matchScoreText}>{score}% Match</span>
-            </div>
-            <div style={styles.matchDetails}>
-              {mf.languageFit?.coverage && (
-                <span style={styles.matchDetail}>
-                  {mf.languageFit.coverage}% Language Fit
-                </span>
-              )}
-              {mf.topicCoverage?.matches?.length > 0 && (
-                <span style={styles.matchDetail}>
-                  {mf.topicCoverage.matches.length} Topic Matches
-                </span>
-              )}
-            </div>
-          </div>
+          <ExpandableMatchSummary
+            score={score}
+            matchFactors={mf}
+            project={project}
+            userProfile={null} // Optional: pass user profile if available
+          />
         </div>
 
         {/* Content */}

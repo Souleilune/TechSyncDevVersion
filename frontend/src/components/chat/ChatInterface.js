@@ -51,6 +51,22 @@ const ChatInterface = ({ projectId }) => {
     return displayName.charAt(0).toUpperCase();
   };
 
+  const getSafeUser = (message) => {
+    // If user object exists, use it
+    if (message.user && message.user.id) {
+      return message.user;
+    }
+    
+    // FALLBACK: Create a minimal user object from user_id
+    console.warn('⚠️ Message missing user object, using fallback:', message.id);
+    return {
+      id: message.user_id || 'unknown',
+      username: 'User',
+      full_name: 'Unknown User',
+      avatar_url: null
+    };
+  };
+
   // Initialize chat when component mounts
   useEffect(() => {
     if (projectId && connected) {
@@ -362,12 +378,14 @@ const ChatInterface = ({ projectId }) => {
               {/* Messages Container */}
               <div style={{ flex: 1, paddingBottom: '16px' }}>
                 {currentMessages.map((message) => {
-                  if (!message || !message.user) {
-                    console.warn('Message or user is undefined:', message);
+                  // ✅ CRITICAL FIX: Don't filter out messages, use fallback instead
+                  if (!message) {
+                    console.warn('⚠️ Null message detected, skipping');
                     return null;
                   }
 
-                  const isOwnMessage = user && message.user && message.user.id === user.id;
+                  const messageUser = getSafeUser(message);  // ✅ Use safe getter with fallback
+                  const isOwnMessage = user && messageUser && messageUser.id === user.id;
 
                   return (
                     <div 

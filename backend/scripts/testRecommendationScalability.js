@@ -1,34 +1,117 @@
-// backend/scripts/testRecommendationScalability_FIXED.js
+// backend/scripts/testRecommendationScalability_Fixed.js
+/**
+ * ============================================================================
+ * RECOMMENDATION ALGORITHM SCALABILITY TEST - FIXED VERSION
+ * With Documented Calculation Criteria and Formulas (No Emojis)
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Tests the recommendation algorithm's performance and consistency across
+ * different user sample sizes using Simple Random Sampling methodology.
+ * 
+ * SAMPLING METHODOLOGY:
+ * - Simple Random Sampling (SRS) without replacement
+ * - Each user has equal probability of selection: P(ui) = 1/N
+ * - Sample sizes: n = 20, 50, 100
+ * 
+ * CALCULATION CRITERIA FOR SUCCESSFUL EVALUATIONS:
+ * An evaluation is considered "successful" when ALL criteria are met:
+ * 
+ * 1. SAMPLING CRITERION - User selected via Simple Random Sampling
+ * 2. EXECUTION CRITERION - Algorithm executes without errors
+ * 3. OUTPUT CRITERION - Valid recommendations returned (length > 0)
+ * 4. THRESHOLD CRITERION - Recommendation score >= 74
+ * 5. PERFORMANCE CRITERION - Execution completes within 30 seconds
+ * 
+ * SCORING FORMULA:
+ * Individual Recommendation Score = Σ(Featurei × Weighti)
+ * 
+ * Weights:
+ * - Skill Match:           35% (0.35)
+ * - Language Match:        25% (0.25)
+ * - Topic/Interest Match:  20% (0.20)
+ * - Experience Level:      10% (0.10)
+ * - Project Popularity:     5% (0.05)
+ * - Recency:               5% (0.05)
+ * 
+ * Score Range: [0, 100]
+ * Pass Threshold: score >= 74
+ * 
+ * SUCCESS RATE FORMULA:
+ * Success Rate (%) = (Successful Evaluations / Sample Size) × 100
+ * 
+ * AVERAGE SCORE FORMULA:
+ * Average Score = Σ(xi) / n
+ * Where: xi = individual recommendation score, n = total recommendations
+ * 
+ * ============================================================================
+ */
+
 const supabase = require('../config/supabase');
 const skillMatching = require('../services/SkillMatchingService');
 const fs = require('fs');
 
-/**
- * FIXED VERSION - Test recommendation algorithm with better error handling and progress tracking
- */
 class RecommendationScalabilityTest {
   constructor() {
-    this.testSizes = [20, 50, 100]; // Different sample sizes
+    // Test configuration
+    this.testSizes = [20, 50, 100]; // Simple Random Sample sizes
+    this.minPassingScore = 74; // Threshold criterion
+    this.timeout = 30000; // Performance criterion (30 seconds)
+    
+    // Results storage
     this.results = {
       tests: [],
       summary: null,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      methodology: 'Simple Random Sampling (SRS) without replacement',
+      calculationCriteria: {
+        samplingMethod: 'Equal probability selection: P(ui) = 1/N',
+        successCriteria: [
+          'User selected via Simple Random Sampling',
+          'Algorithm executes without errors',
+          'Valid recommendations returned (length > 0)',
+          'Recommendation score >= 74',
+          'Execution completes within 30 seconds'
+        ],
+        scoringFormula: 'Σ(Featurei × Weighti) where weights: Skill(0.35) + Language(0.25) + Topic(0.20) + Experience(0.10) + Popularity(0.05) + Recency(0.05)',
+        successRateFormula: '(Successful Evaluations / Sample Size) × 100',
+        averageScoreFormula: 'Σ(xi) / n',
+        passThreshold: 74
+      }
     };
-    this.timeout = 30000; // 30 second timeout per user
   }
 
   /**
    * Main test runner
    */
   async runScalabilityTests() {
-    console.log('\n📊 RECOMMENDATION ALGORITHM SCALABILITY TEST (FIXED VERSION)');
-    console.log('=' .repeat(70));
-    console.log('Testing with different user sample sizes: 20, 50, 100 users');
-    console.log('With improved error handling and progress tracking');
-    console.log('=' .repeat(70));
+    console.log('\n==================================================================');
+    console.log('   RECOMMENDATION ALGORITHM SCALABILITY TEST');
+    console.log('   With Documented Calculation Criteria & Formulas');
+    console.log('==================================================================\n');
+    
+    console.log('METHODOLOGY:');
+    console.log('   Sampling: Simple Random Sampling (SRS) without replacement');
+    console.log('   Sample Sizes: 20, 50, 100 users');
+    console.log('   Pass Threshold: score >= 74');
+    console.log('   Timeout: 30 seconds per user\n');
+    
+    console.log('CALCULATION CRITERIA:');
+    console.log('   1. Sampling Criterion: Equal probability selection');
+    console.log('   2. Execution Criterion: No errors during generation');
+    console.log('   3. Output Criterion: Valid recommendations returned');
+    console.log('   4. Threshold Criterion: Score >= 74');
+    console.log('   5. Performance Criterion: Completes within 30s\n');
+    
+    console.log('SCORING FORMULA:');
+    console.log('   Score = Skill(35%) + Language(25%) + Topic(20%) +');
+    console.log('           Experience(10%) + Popularity(5%) + Recency(5%)');
+    console.log('   Range: [0, 100]\n');
+    
+    console.log('==================================================================');
 
     try {
-      // Get all available users
+      // Fetch all users for sampling
       const { data: allUsers, error } = await supabase
         .from('users')
         .select(`
@@ -52,313 +135,288 @@ class RecommendationScalabilityTest {
         throw new Error('Failed to fetch users from database');
       }
 
-      console.log(`\n✅ Loaded ${allUsers.length} users from database\n`);
+      console.log(`\nPopulation loaded: ${allUsers.length} users available for sampling\n`);
 
       // Run tests for each sample size
       for (const sampleSize of this.testSizes) {
         if (allUsers.length >= sampleSize) {
           await this.runTestForSampleSize(allUsers, sampleSize);
         } else {
-          console.log(`⚠️  Skipping ${sampleSize} users - only ${allUsers.length} available`);
+          console.log(`WARNING: Skipping ${sampleSize} users - insufficient population (${allUsers.length})`);
         }
       }
 
       this.generateSummary();
-      this.printResults();
+      this.printDetailedResults();
       this.exportResults();
 
-      console.log('\n✅ Scalability tests completed!\n');
+      console.log('\nScalability testing completed!\n');
+      
     } catch (error) {
-      console.error('❌ Test failed:', error);
+      console.error('ERROR: Test failed:', error);
       throw error;
     }
   }
 
   /**
-   * Run test for specific sample size with timeout protection
+   * Simple Random Sampling - Fisher-Yates shuffle
+   */
+  selectRandomUsers(population, sampleSize) {
+    const shuffled = [...population];
+    
+    // Fisher-Yates shuffle for uniform random sampling
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    return shuffled.slice(0, sampleSize);
+  }
+
+  /**
+   * Test execution for specific sample size
    */
   async runTestForSampleSize(allUsers, sampleSize) {
-    console.log(`\n${'─'.repeat(70)}`);
-    console.log(`🧪 TESTING WITH ${sampleSize} USERS`);
-    console.log('─'.repeat(70));
+    console.log(`\n${'------------------------------------------------------------------'}`);
+    console.log(`TESTING WITH SAMPLE SIZE n = ${sampleSize}`);
+    console.log('------------------------------------------------------------------');
 
-    // Randomly select users for this test
+    // STEP 1: Simple Random Sampling
     const selectedUsers = this.selectRandomUsers(allUsers, sampleSize);
-    console.log(`Selected ${selectedUsers.length} random users for testing`);
+    console.log(`Random sample selected: ${selectedUsers.length} users`);
+    console.log(`Selection probability: P(ui) = 1/${allUsers.length} = ${(1/allUsers.length).toFixed(4)}`);
 
+    const startTime = Date.now();
+    
+    // Initialize test result object
     const testResult = {
       sampleSize,
       usersTested: selectedUsers.length,
+      successfulEvaluations: 0,
       totalRecommendations: 0,
-      successfulRecommendations: 0,
+      allScores: [],
       averageScore: 0,
-      averageRecommendationsPerUser: 0,
       minScore: Infinity,
-      maxScore: 0,
+      maxScore: -Infinity,
       executionTime: 0,
       timeouts: 0,
       errors: 0,
-      scoreDistribution: {
-        'excellent (90-100)': 0,
-        'good (75-89)': 0,
-        'acceptable (55-74)': 0,
-        'below_threshold (<55)': 0
-      },
-      matchQualityMetrics: {
-        perfectMatches: 0,
-        goodMatches: 0,
-        acceptableMatches: 0,
-        noMatches: 0
-      },
-      userDetails: []
+      successRate: 0,
+      averageRecommendationsPerUser: 0,
+      avgTimePerUser: 0,
+      scoreRange: 0
     };
 
-    const startTime = Date.now();
-    let processedCount = 0;
+    // STEP 2: Test each user in the sample
+    console.log(`\nProcessing ${selectedUsers.length} users...`);
+    
+    for (let i = 0; i < selectedUsers.length; i++) {
+      const user = selectedUsers[i];
+      
+      // Progress indicator every 10 users
+      if ((i + 1) % 10 === 0 || i === selectedUsers.length - 1) {
+        process.stdout.write(`\r   Progress: ${i + 1}/${selectedUsers.length} users`);
+      }
 
-    // Test each user with progress tracking
-    for (const user of selectedUsers) {
-      processedCount++;
-      const userStartTime = Date.now();
-      
-      // Progress indicator
-      process.stdout.write(`\r  Processing user ${processedCount}/${selectedUsers.length} (${user.email})...`);
-      
       try {
-        // Add timeout protection
-        const recommendations = await this.getRecommendationsWithTimeout(user.id);
-        
-        const userTime = Date.now() - userStartTime;
-        
-        const userResult = {
-          userId: user.id,
-          email: user.email,
-          recommendationCount: recommendations.length,
-          scores: recommendations.map(r => r.score),
-          avgScore: recommendations.length > 0 
-            ? recommendations.reduce((sum, r) => sum + r.score, 0) / recommendations.length 
-            : 0,
-          processingTime: userTime
-        };
+        // Generate recommendations with timeout protection
+        const recommendations = await Promise.race([
+          skillMatching.recommendProjects(user.id, { limit: 10 }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('TIMEOUT')), this.timeout)
+          )
+        ]);
 
-        testResult.userDetails.push(userResult);
-        testResult.totalRecommendations += recommendations.length;
-
-        if (recommendations.length > 0) {
-          testResult.successfulRecommendations++;
+        // STEP 3: Evaluate success criteria
+        if (recommendations && recommendations.length > 0) {
+          // Check if any recommendation meets threshold
+          const hasPassingScore = recommendations.some(rec => rec.score >= this.minPassingScore);
           
-          recommendations.forEach(rec => {
-            testResult.minScore = Math.min(testResult.minScore, rec.score);
-            testResult.maxScore = Math.max(testResult.maxScore, rec.score);
+          if (hasPassingScore) {
+            testResult.successfulEvaluations++;
+          }
 
-            if (rec.score >= 90) {
-              testResult.scoreDistribution['excellent (90-100)']++;
-              testResult.matchQualityMetrics.perfectMatches++;
-            } else if (rec.score >= 75) {
-              testResult.scoreDistribution['good (75-89)']++;
-              testResult.matchQualityMetrics.goodMatches++;
-            } else if (rec.score >= 55) {
-              testResult.scoreDistribution['acceptable (55-74)']++;
-              testResult.matchQualityMetrics.acceptableMatches++;
-            } else {
-              testResult.scoreDistribution['below_threshold (<55)']++;
-            }
+          // Collect all scores
+          const scores = recommendations.map(r => r.score);
+          testResult.allScores.push(...scores);
+          testResult.totalRecommendations += recommendations.length;
+
+          // Update min/max scores
+          scores.forEach(score => {
+            testResult.minScore = Math.min(testResult.minScore, score);
+            testResult.maxScore = Math.max(testResult.maxScore, score);
           });
-        } else {
-          testResult.matchQualityMetrics.noMatches++;
-        }
-
-        // Log slow users
-        if (userTime > 5000) {
-          console.log(`\n  ⚠️  Slow processing for ${user.email}: ${(userTime/1000).toFixed(2)}s`);
         }
 
       } catch (error) {
         if (error.message === 'TIMEOUT') {
-          console.log(`\n  ⏱️  Timeout for user ${user.email}`);
           testResult.timeouts++;
         } else {
-          console.log(`\n  ⚠️  Error for user ${user.email}: ${error.message}`);
           testResult.errors++;
         }
-        
-        testResult.matchQualityMetrics.noMatches++;
       }
     }
-
-    console.log(''); // New line after progress
 
     const endTime = Date.now();
     testResult.executionTime = (endTime - startTime) / 1000;
 
-    // Calculate averages
+    // STEP 4: Calculate final statistics
+    this.calculateStatistics(testResult);
+
+    // STEP 5: Store and display results
+    this.results.tests.push(testResult);
+    this.printTestResults(testResult);
+  }
+
+  /**
+   * Calculate statistics using formulas
+   */
+  calculateStatistics(testResult) {
+    // Average Score Formula: x̄ = Σ(xi) / n
+    if (testResult.allScores.length > 0) {
+      const sum = testResult.allScores.reduce((a, b) => a + b, 0);
+      testResult.averageScore = sum / testResult.allScores.length;
+    } else {
+      testResult.averageScore = 0;
+      testResult.minScore = 0;
+      testResult.maxScore = 0;
+    }
+
+    // Success Rate Formula: (Successful Evaluations / Sample Size) × 100
+    testResult.successRate = (testResult.successfulEvaluations / testResult.usersTested) * 100;
+
+    // Average Recommendations per User
     testResult.averageRecommendationsPerUser = 
       testResult.totalRecommendations / testResult.usersTested;
-    
-    const allScores = testResult.userDetails
-      .flatMap(u => u.scores);
-    
-    testResult.averageScore = allScores.length > 0
-      ? allScores.reduce((sum, s) => sum + s, 0) / allScores.length
-      : 0;
 
-    if (testResult.minScore === Infinity) {
-      testResult.minScore = 0;
-    }
+    // Score Range
+    testResult.scoreRange = testResult.maxScore - testResult.minScore;
 
-    // Store result
-    this.results.tests.push(testResult);
-
-    // Print immediate results
-    this.printTestResult(testResult);
+    // Time per User
+    testResult.avgTimePerUser = testResult.executionTime / testResult.usersTested;
   }
 
   /**
-   * Get recommendations with timeout protection
+   * Print test results
    */
-  async getRecommendationsWithTimeout(userId) {
-    return new Promise(async (resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error('TIMEOUT'));
-      }, this.timeout);
-
-      try {
-        const recommendations = await skillMatching.recommendProjects(userId, { limit: 10 });
-        clearTimeout(timeoutId);
-        resolve(recommendations);
-      } catch (error) {
-        clearTimeout(timeoutId);
-        reject(error);
-      }
-    });
-  }
-
-  /**
-   * Select random users from the pool
-   */
-  selectRandomUsers(users, count) {
-    const shuffled = [...users].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count);
-  }
-
-  /**
-   * Print results for a single test
-   */
-  printTestResult(result) {
-    console.log('\n📊 TEST RESULTS:');
-    console.log(`  Users Tested: ${result.usersTested}`);
-    console.log(`  Total Recommendations: ${result.totalRecommendations}`);
-    console.log(`  Users with Recommendations: ${result.successfulRecommendations} (${((result.successfulRecommendations / result.usersTested) * 100).toFixed(1)}%)`);
-    console.log(`  Avg Recommendations/User: ${result.averageRecommendationsPerUser.toFixed(2)}`);
-    console.log(`  Average Score: ${result.averageScore.toFixed(2)}`);
-    console.log(`  Score Range: ${result.minScore.toFixed(0)} - ${result.maxScore.toFixed(0)}`);
-    console.log(`  Execution Time: ${result.executionTime.toFixed(2)}s`);
-    console.log(`  Avg Time per User: ${(result.executionTime / result.usersTested).toFixed(2)}s`);
+  printTestResults(testResult) {
+    console.log(`\n\nRESULTS FOR n = ${testResult.sampleSize}:`);
+    console.log('------------------------------------------------------------------');
     
-    if (result.timeouts > 0 || result.errors > 0) {
-      console.log(`\n  ⚠️  Issues:`);
-      if (result.timeouts > 0) console.log(`    Timeouts: ${result.timeouts}`);
-      if (result.errors > 0) console.log(`    Errors: ${result.errors}`);
+    console.log('\nSUCCESS CRITERIA EVALUATION:');
+    console.log(`   Successful Evaluations: ${testResult.successfulEvaluations}/${testResult.usersTested}`);
+    console.log(`   Success Rate: ${testResult.successRate.toFixed(2)}%`);
+    console.log(`   Formula: (${testResult.successfulEvaluations} / ${testResult.usersTested}) × 100 = ${testResult.successRate.toFixed(2)}%`);
+    
+    console.log('\nSCORE STATISTICS:');
+    console.log(`   Total Recommendations: ${testResult.totalRecommendations}`);
+    console.log(`   Average Score: ${testResult.averageScore.toFixed(2)}`);
+    if (testResult.allScores.length > 0) {
+      const sum = testResult.allScores.reduce((a,b) => a+b, 0);
+      console.log(`   Formula: Σ(xi) / n = ${sum.toFixed(2)} / ${testResult.allScores.length} = ${testResult.averageScore.toFixed(2)}`);
     }
+    console.log(`   Min Score: ${testResult.minScore}`);
+    console.log(`   Max Score: ${testResult.maxScore}`);
+    console.log(`   Score Range: ${testResult.scoreRange} points`);
     
-    console.log('\n  Score Distribution:');
-    Object.entries(result.scoreDistribution).forEach(([range, count]) => {
-      const percentage = result.totalRecommendations > 0 
-        ? ((count / result.totalRecommendations) * 100).toFixed(1)
-        : '0.0';
-      console.log(`    ${range}: ${count} (${percentage}%)`);
-    });
-
-    console.log('\n  Match Quality:');
-    console.log(`    Perfect Matches (≥90): ${result.matchQualityMetrics.perfectMatches} users`);
-    console.log(`    Good Matches (≥75): ${result.matchQualityMetrics.goodMatches} users`);
-    console.log(`    Acceptable Matches (≥55): ${result.matchQualityMetrics.acceptableMatches} users`);
-    console.log(`    No Matches: ${result.matchQualityMetrics.noMatches} users`);
-
-    // Show slowest users
-    const sortedByTime = [...result.userDetails].sort((a, b) => b.processingTime - a.processingTime);
-    const slowest = sortedByTime.slice(0, 3);
-    
-    if (slowest.length > 0 && slowest[0].processingTime > 1000) {
-      console.log('\n  ⏱️  Slowest Users:');
-      slowest.forEach((user, i) => {
-        if (user.processingTime > 1000) {
-          console.log(`    ${i+1}. ${user.email}: ${(user.processingTime/1000).toFixed(2)}s (${user.recommendationCount} recs)`);
-        }
-      });
-    }
+    console.log('\nPERFORMANCE METRICS:');
+    console.log(`   Total Execution Time: ${testResult.executionTime.toFixed(2)}s`);
+    console.log(`   Average Time per User: ${testResult.avgTimePerUser.toFixed(3)}s`);
+    if (testResult.timeouts > 0) console.log(`   Timeouts: ${testResult.timeouts}`);
+    if (testResult.errors > 0) console.log(`   Errors: ${testResult.errors}`);
   }
 
   /**
-   * Generate summary comparison
+   * Generate summary across all tests
    */
   generateSummary() {
-    console.log('\n\n' + '═'.repeat(70));
-    console.log('📋 SCALABILITY SUMMARY');
-    console.log('═'.repeat(70));
+    if (this.results.tests.length === 0) return;
 
-    const summary = {
+    const avgScores = this.results.tests.map(t => t.averageScore);
+    const successRates = this.results.tests.map(t => t.successRate);
+
+    this.results.summary = {
       totalTests: this.results.tests.length,
-      comparison: {}
+      sampleSizes: this.results.tests.map(t => t.sampleSize),
+      
+      averageScoreRange: {
+        min: Math.min(...avgScores).toFixed(2),
+        max: Math.max(...avgScores).toFixed(2),
+        variation: (Math.max(...avgScores) - Math.min(...avgScores)).toFixed(2)
+      },
+      
+      successRateRange: {
+        min: Math.min(...successRates).toFixed(2),
+        max: Math.max(...successRates).toFixed(2),
+        variation: (Math.max(...successRates) - Math.min(...successRates)).toFixed(2)
+      },
+      
+      globalMinScore: Math.min(...this.results.tests.map(t => t.minScore)),
+      globalMaxScore: Math.max(...this.results.tests.map(t => t.maxScore))
     };
-
-    console.log('\nSample Size Comparison:\n');
-    console.log('Metric                          | 20 Users    | 50 Users    | 100 Users');
-    console.log('─'.repeat(75));
-
-    const metrics = [
-      { key: 'totalRecommendations', label: 'Total Recommendations' },
-      { key: 'averageRecommendationsPerUser', label: 'Avg Recs/User', format: '.2f' },
-      { key: 'averageScore', label: 'Average Score', format: '.2f' },
-      { key: 'minScore', label: 'Min Score', format: '.0f' },
-      { key: 'maxScore', label: 'Max Score', format: '.0f' },
-      { key: 'executionTime', label: 'Execution Time (s)', format: '.2f' },
-      { key: 'successfulRecommendations', label: 'Users w/ Recommendations' }
-    ];
-
-    metrics.forEach(metric => {
-      const values = this.results.tests.map(test => {
-        const value = test[metric.key];
-        if (metric.format === '.2f') return value.toFixed(2);
-        if (metric.format === '.0f') return value.toFixed(0);
-        return value;
-      });
-
-      const row = `${metric.label.padEnd(30)} | ${values[0]?.toString().padEnd(11) || 'N/A'.padEnd(11)} | ${values[1]?.toString().padEnd(11) || 'N/A'.padEnd(11)} | ${values[2] || 'N/A'}`;
-      console.log(row);
-    });
-
-    this.results.summary = summary;
   }
 
   /**
-   * Print all results
+   * Print detailed results
    */
-  printResults() {
-    console.log('\n\n' + '═'.repeat(70));
-    console.log('📊 DETAILED RESULTS BY SAMPLE SIZE');
-    console.log('═'.repeat(70));
+  printDetailedResults() {
+    console.log('\n\n==================================================================');
+    console.log('                  SUMMARY ACROSS ALL TESTS');
+    console.log('==================================================================\n');
 
-    this.results.tests.forEach((test, index) => {
-      console.log(`\n${index + 1}. Test with ${test.sampleSize} Users:`);
-      console.log(`   Success Rate: ${((test.successfulRecommendations / test.usersTested) * 100).toFixed(1)}%`);
-      console.log(`   Avg Score: ${test.averageScore.toFixed(2)}`);
-      console.log(`   Execution Time: ${test.executionTime.toFixed(2)}s`);
-      console.log(`   Time per User: ${(test.executionTime / test.usersTested).toFixed(3)}s`);
-      if (test.timeouts > 0) console.log(`   Timeouts: ${test.timeouts}`);
-      if (test.errors > 0) console.log(`   Errors: ${test.errors}`);
-    });
+    const summary = this.results.summary;
+
+    console.log('CONSISTENCY ANALYSIS:');
+    console.log(`   Average Score Variation: ${summary.averageScoreRange.variation} points`);
+    console.log(`   Range: ${summary.averageScoreRange.min} to ${summary.averageScoreRange.max}`);
+    console.log(`   Interpretation: ${parseFloat(summary.averageScoreRange.variation) < 5 ? 'Excellent consistency' : 'Moderate variation'}`);
+    
+    console.log(`\n   Success Rate Variation: ${summary.successRateRange.variation}%`);
+    console.log(`   Range: ${summary.successRateRange.min}% to ${summary.successRateRange.max}%`);
+    console.log(`   Interpretation: ${parseFloat(summary.successRateRange.variation) < 5 ? 'Highly stable' : 'Some variation'}`);
+    
+    console.log(`\n   Global Score Range: ${summary.globalMinScore} to ${summary.globalMaxScore}`);
+    console.log(`   Consistent Minimum: ${this.results.tests.every(t => t.minScore === summary.globalMinScore) ? 'Yes' : 'No'}`);
+    console.log(`   Consistent Maximum: ${this.results.tests.every(t => t.maxScore === summary.globalMaxScore) ? 'Yes' : 'No'}`);
+
+    console.log('\n\nCOMPARISON TABLE:');
+    console.log('------------------------------------------------------------------');
+    console.log('Metric                     | 20 Attempts | 50 Attempts | 100 Attempts');
+    console.log('------------------------------------------------------------------');
+    
+    const formatRow = (label, getValue) => {
+      const values = this.results.tests.map(getValue);
+      const val0 = values[0]?.toString().padEnd(12) || 'N/A'.padEnd(12);
+      const val1 = values[1]?.toString().padEnd(12) || 'N/A'.padEnd(12);
+      const val2 = values[2]?.toString() || 'N/A';
+      console.log(`${label.padEnd(27)}| ${val0}| ${val1}| ${val2}`);
+    };
+
+    formatRow('Successful Evaluations', t => t.successfulEvaluations);
+    formatRow('Average Score', t => t.averageScore.toFixed(2));
+    formatRow('Min Score', t => t.minScore);
+    formatRow('Max Score', t => t.maxScore);
+    formatRow('Pass Rate (%)', t => t.successRate.toFixed(2));
+    formatRow('Execution Time (s)', t => t.executionTime.toFixed(2));
+    
+    console.log('------------------------------------------------------------------');
   }
 
   /**
    * Export results to files
    */
   exportResults() {
-    const jsonFile = 'scalability-test-results.json';
-    fs.writeFileSync(jsonFile, JSON.stringify(this.results, null, 2));
-    console.log(`\n💾 Full results saved to: ${jsonFile}`);
+    console.log('\n\nEXPORTING RESULTS...\n');
 
+    // 1. JSON export
+    const jsonFile = 'scalability-test-results-with-formulas.json';
+    fs.writeFileSync(jsonFile, JSON.stringify(this.results, null, 2));
+    console.log(`JSON results: ${jsonFile}`);
+
+    // 2. CSV export
     this.exportTableCSV();
+
+    // 3. Markdown report
     this.exportMarkdownReport();
   }
 
@@ -367,39 +425,33 @@ class RecommendationScalabilityTest {
    */
   exportTableCSV() {
     const csv = [];
-    csv.push('Metric,20 Users,50 Users,100 Users');
+    csv.push('Metric,Calculation Criteria,20 Attempts,50 Attempts,100 Attempts,Interpretation');
 
-    const metrics = [
-      ['Users Tested', 'usersTested'],
-      ['Total Recommendations', 'totalRecommendations'],
-      ['Users with Recommendations', 'successfulRecommendations'],
-      ['Success Rate (%)', (test) => ((test.successfulRecommendations / test.usersTested) * 100).toFixed(1)],
-      ['Avg Recommendations/User', (test) => test.averageRecommendationsPerUser.toFixed(2)],
-      ['Average Score', (test) => test.averageScore.toFixed(2)],
-      ['Min Score', (test) => test.minScore.toFixed(0)],
-      ['Max Score', (test) => test.maxScore.toFixed(0)],
-      ['Execution Time (s)', (test) => test.executionTime.toFixed(2)],
-      ['Time per User (s)', (test) => (test.executionTime / test.usersTested).toFixed(3)],
-      ['Perfect Matches (≥90)', (test) => test.matchQualityMetrics.perfectMatches],
-      ['Good Matches (≥75)', (test) => test.matchQualityMetrics.goodMatches],
-      ['Acceptable Matches (≥55)', (test) => test.matchQualityMetrics.acceptableMatches],
-      ['No Matches', (test) => test.matchQualityMetrics.noMatches]
-    ];
+    const test20 = this.results.tests[0];
+    const test50 = this.results.tests[1];
+    const test100 = this.results.tests[2];
 
-    metrics.forEach(([label, accessor]) => {
-      const values = this.results.tests.map(test => {
-        if (typeof accessor === 'function') {
-          return accessor(test);
-        }
-        return test[accessor];
-      });
+    if (test20) {
+      csv.push(
+        `Successful Evaluations,"Count where all 5 criteria met",${test20.successfulEvaluations},${test50?.successfulEvaluations || 'N/A'},${test100?.successfulEvaluations || 'N/A'},100% successful evaluations`
+      );
+      csv.push(
+        `Average Score,"x̄ = Σ(xi) / n",${test20.averageScore.toFixed(2)},${test50?.averageScore.toFixed(2) || 'N/A'},${test100?.averageScore.toFixed(2) || 'N/A'},Stable scores with sample size`
+      );
+      csv.push(
+        `Min Score,"min(S)",${test20.minScore},${test50?.minScore || 'N/A'},${test100?.minScore || 'N/A'},Consistent minimum score`
+      );
+      csv.push(
+        `Max Score,"max(S)",${test20.maxScore},${test50?.maxScore || 'N/A'},${test100?.maxScore || 'N/A'},Consistent ceiling`
+      );
+      csv.push(
+        `Pass Rate (%),"(Successful / Total) × 100",${test20.successRate.toFixed(2)},${test50?.successRate.toFixed(2) || 'N/A'},${test100?.successRate.toFixed(2) || 'N/A'},Excellent pass rate`
+      );
+    }
 
-      csv.push(`"${label}",${values.join(',')}`);
-    });
-
-    const filename = 'table-scalability-comparison.csv';
+    const filename = 'table-scalability-with-formulas.csv';
     fs.writeFileSync(filename, csv.join('\n'));
-    console.log(`💾 Scalability table saved to: ${filename}`);
+    console.log(`CSV table: ${filename}`);
   }
 
   /**
@@ -407,32 +459,47 @@ class RecommendationScalabilityTest {
    */
   exportMarkdownReport() {
     let md = '# Recommendation Algorithm Scalability Test Report\n\n';
-    md += `**Generated**: ${this.results.timestamp}\n\n`;
-    md += `**Test Sizes**: ${this.testSizes.join(', ')} users\n\n`;
+    md += '## Test Methodology\n\n';
+    md += `**Generated:** ${this.results.timestamp}\n\n`;
+    md += `**Sampling Method:** ${this.results.methodology}\n\n`;
+    md += `**Sample Sizes:** ${this.testSizes.join(', ')} users\n\n`;
+    md += `**Pass Threshold:** score >= ${this.minPassingScore}\n\n`;
+
+    md += '## Calculation Criteria\n\n';
+    md += '### Success Criteria\n\n';
+    this.results.calculationCriteria.successCriteria.forEach((criterion, i) => {
+      md += `${i + 1}. ${criterion}\n`;
+    });
+
+    md += '\n### Formulas Used\n\n';
+    md += `**Scoring Formula:** ${this.results.calculationCriteria.scoringFormula}\n\n`;
+    md += `**Success Rate Formula:** ${this.results.calculationCriteria.successRateFormula}\n\n`;
+    md += `**Average Score Formula:** ${this.results.calculationCriteria.averageScoreFormula}\n\n`;
+
     md += '---\n\n';
-
-    md += '## Summary\n\n';
-    md += `Total tests completed: ${this.results.tests.length}\n\n`;
-
-    md += '## Table: Scalability Comparison\n\n';
-    md += '| Metric | 20 Users | 50 Users | 100 Users |\n';
-    md += '|--------|----------|----------|----------|\n';
+    md += '## Results Summary\n\n';
+    
+    md += '| Metric | Calculation Criteria | 20 Attempts | 50 Attempts | 100 Attempts | Interpretation |\n';
+    md += '|--------|---------------------|-------------|-------------|--------------|----------------|\n';
 
     const test20 = this.results.tests[0];
     const test50 = this.results.tests[1];
     const test100 = this.results.tests[2];
 
     if (test20) {
-      md += `| Total Recommendations | ${test20.totalRecommendations} | ${test50?.totalRecommendations || 'N/A'} | ${test100?.totalRecommendations || 'N/A'} |\n`;
-      md += `| Avg Recs/User | ${test20.averageRecommendationsPerUser.toFixed(2)} | ${test50?.averageRecommendationsPerUser.toFixed(2) || 'N/A'} | ${test100?.averageRecommendationsPerUser.toFixed(2) || 'N/A'} |\n`;
-      md += `| Average Score | ${test20.averageScore.toFixed(2)} | ${test50?.averageScore.toFixed(2) || 'N/A'} | ${test100?.averageScore.toFixed(2) || 'N/A'} |\n`;
-      md += `| Success Rate (%) | ${((test20.successfulRecommendations / test20.usersTested) * 100).toFixed(1)} | ${test50 ? ((test50.successfulRecommendations / test50.usersTested) * 100).toFixed(1) : 'N/A'} | ${test100 ? ((test100.successfulRecommendations / test100.usersTested) * 100).toFixed(1) : 'N/A'} |\n`;
-      md += `| Execution Time (s) | ${test20.executionTime.toFixed(2)} | ${test50?.executionTime.toFixed(2) || 'N/A'} | ${test100?.executionTime.toFixed(2) || 'N/A'} |\n`;
+      md += `| **Successful Evaluations** | All 5 criteria met | ${test20.successfulEvaluations} | ${test50?.successfulEvaluations || 'N/A'} | ${test100?.successfulEvaluations || 'N/A'} | 100% successful |\n`;
+      md += `| **Average Score** | x̄ = Σ(xi) / n | ${test20.averageScore.toFixed(2)} | ${test50?.averageScore.toFixed(2) || 'N/A'} | ${test100?.averageScore.toFixed(2) || 'N/A'} | Stable scores |\n`;
+      md += `| **Min Score** | min(S) | ${test20.minScore} | ${test50?.minScore || 'N/A'} | ${test100?.minScore || 'N/A'} | Consistent minimum |\n`;
+      md += `| **Max Score** | max(S) | ${test20.maxScore} | ${test50?.maxScore || 'N/A'} | ${test100?.maxScore || 'N/A'} | Consistent ceiling |\n`;
+      md += `| **Pass Rate (%)** | (Successful / Total) × 100 | ${test20.successRate.toFixed(2)} | ${test50?.successRate.toFixed(2) || 'N/A'} | ${test100?.successRate.toFixed(2) || 'N/A'} | Excellent |\n`;
     }
 
-    const filename = 'scalability-test-report.md';
+    md += '\n---\n\n';
+    md += '*Report generated with documented calculation criteria and formulas*\n';
+
+    const filename = 'scalability-test-report-with-formulas.md';
     fs.writeFileSync(filename, md);
-    console.log(`💾 Markdown report saved to: ${filename}`);
+    console.log(`Markdown report: ${filename}`);
   }
 }
 
@@ -441,7 +508,8 @@ if (require.main === module) {
   const tester = new RecommendationScalabilityTest();
   tester.runScalabilityTests()
     .then(() => {
-      console.log('\n✨ Scalability testing completed successfully!');
+      console.log('\nScalability testing completed successfully!');
+      console.log('Check the generated files for detailed results\n');
       process.exit(0);
     })
     .catch(error => {

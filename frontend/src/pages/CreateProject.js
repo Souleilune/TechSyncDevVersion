@@ -1,4 +1,4 @@
-// frontend/src/pages/CreateProject.js - WITH STYLED SCROLLBAR AND GRADIENT CONTAINER
+// frontend/src/pages/CreateProject.js - IMPROVED VERSION WITH BETTER VALIDATION
 import React, { useState, useEffect } from 'react';
 import { projectService } from '../services/projectService';
 import { suggestionsService } from '../services/suggestionsService';
@@ -260,6 +260,10 @@ function CreateProject({ onClose }) {
   const [errors, setErrors] = useState([]);
   const [topicSuggestions, setTopicSuggestions] = useState([]);
   const [languageSuggestions, setLanguageSuggestions] = useState([]);
+  const [validationErrors, setValidationErrors] = useState({
+    description: '',
+    detailed_description: ''
+  });
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -293,7 +297,36 @@ function CreateProject({ onClose }) {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    setErrors([]);
+    
+    // Real-time validation for description fields
+    if (field === 'description' || field === 'detailed_description') {
+      const trimmedValue = value.trim();
+      const minLength = 10;
+      
+      if (trimmedValue.length > 0 && trimmedValue.length < minLength) {
+        setValidationErrors(prev => ({
+          ...prev,
+          [field]: `Minimum ${minLength} characters required`
+        }));
+      } else {
+        setValidationErrors(prev => ({
+          ...prev,
+          [field]: ''
+        }));
+      }
+    }
+  };
+
+  const getInputBorderStyle = (field, value) => {
+    const trimmedValue = value.trim();
+    const hasError = trimmedValue.length > 0 && trimmedValue.length < 10;
+    
+    return {
+      border: hasError 
+        ? '2px solid #ef4444'  // Red border for errors
+        : '1px solid rgba(255, 255, 255, 0.2)',  // Normal border
+      transition: 'all 0.3s ease'
+    };
   };
 
   const handleNext = () => {
@@ -305,92 +338,92 @@ function CreateProject({ onClose }) {
   };
 
   const handleSubmit = async () => {
-  if (isSubmitting) return;
-  
-  setIsSubmitting(true);
-  setErrors([]);
-  
-  try {
-    // ✅ FIX: Build projectData object conditionally - only include fields that have values
-    const projectData = {
-      title: formData.title.trim(),
-      description: formData.description.trim(),
-    };
-
-    // Add optional fields ONLY if they have actual values
-    if (formData.detailed_description?.trim()) {
-      projectData.detailed_description = formData.detailed_description.trim();
-    }
-
-    if (formData.required_experience_level) {
-      projectData.required_experience_level = formData.required_experience_level;
-    }
-
-    if (formData.maximum_members) {
-      projectData.maximum_members = parseInt(formData.maximum_members);
-    }
-
-    if (formData.estimated_duration_weeks) {
-      projectData.estimated_duration_weeks = parseInt(formData.estimated_duration_weeks);
-    }
-
-    if (formData.difficulty_level) {
-      projectData.difficulty_level = formData.difficulty_level;
-    }
-
-    if (formData.github_repo_url?.trim()) {
-      projectData.github_repo_url = formData.github_repo_url.trim();
-    }
-
-    if (formData.deadline) {
-      projectData.deadline = formData.deadline;
-    }
-
-    // Always include these arrays (can be empty)
-    projectData.programming_languages = formData.selectedLanguages
-      .filter(lang => lang && lang.name)
-      .map(lang => lang.name);
+    if (isSubmitting) return;
     
-    projectData.topics = formData.selectedTopics
-      .filter(topic => topic && topic.name)
-      .map(topic => topic.name);
-
-    console.log('📤 Sending project data:', projectData);
-
-    const response = await projectService.createProject(projectData);
+    setIsSubmitting(true);
+    setErrors([]);
     
-    if (response.success) {
-       try {
-    await projectService.logActivity(response.data.project.id, {  // ✅ Use response.data.project.id
-      action: 'created project',  // ✅ Changed to 'created project'
-      target: response.data.project.title,  // ✅ Use project title
-      type: 'project_updated',
-      metadata: { 
-        projectId: response.data.project.id,  // ✅ Add projectId to metadata
-        title: projectData.title
+    try {
+      // Build projectData object conditionally - only include fields that have values
+      const projectData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+      };
+
+      // Add optional fields ONLY if they have actual values
+      if (formData.detailed_description?.trim()) {
+        projectData.detailed_description = formData.detailed_description.trim();
       }
-    });
-                console.log('✅ Activity logged for project update');
-            } catch (activityError) {
-                console.error('Failed to log activity:', activityError);
+
+      if (formData.required_experience_level) {
+        projectData.required_experience_level = formData.required_experience_level;
+      }
+
+      if (formData.maximum_members) {
+        projectData.maximum_members = parseInt(formData.maximum_members);
+      }
+
+      if (formData.estimated_duration_weeks) {
+        projectData.estimated_duration_weeks = parseInt(formData.estimated_duration_weeks);
+      }
+
+      if (formData.difficulty_level) {
+        projectData.difficulty_level = formData.difficulty_level;
+      }
+
+      if (formData.github_repo_url?.trim()) {
+        projectData.github_repo_url = formData.github_repo_url.trim();
+      }
+
+      if (formData.deadline) {
+        projectData.deadline = formData.deadline;
+      }
+
+      // Always include these arrays (can be empty)
+      projectData.programming_languages = formData.selectedLanguages
+        .filter(lang => lang && lang.name)
+        .map(lang => lang.name);
+      
+      projectData.topics = formData.selectedTopics
+        .filter(topic => topic && topic.name)
+        .map(topic => topic.name);
+
+      console.log('📤 Sending project data:', projectData);
+
+      const response = await projectService.createProject(projectData);
+      
+      if (response.success) {
+        try {
+          await projectService.logActivity(response.data.project.id, {
+            action: 'created project',
+            target: response.data.project.title,
+            type: 'project_updated',
+            metadata: { 
+              projectId: response.data.project.id,
+              title: projectData.title
             }
-      onClose();
-      window.location.reload();
+          });
+          console.log('✅ Activity logged for project update');
+        } catch (activityError) {
+          console.error('Failed to log activity:', activityError);
+        }
+        onClose();
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Project creation error:', error);
+      
+      if (error.response?.data?.errors) {
+        setErrors(error.response.data.errors.map(err => err.msg));
+      } else if (error.response?.data?.message) {
+        setErrors([error.response.data.message]);
+      } else {
+        setErrors(['Failed to create project. Please try again.']);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (error) {
-    console.error('Project creation error:', error);
-    
-    if (error.response?.data?.errors) {
-      setErrors(error.response.data.errors.map(err => err.msg));
-    } else if (error.response?.data?.message) {
-      setErrors([error.response.data.message]);
-    } else {
-      setErrors(['Failed to create project. Please try again.']);
-    }
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const styles = {
     overlay: {
@@ -406,7 +439,6 @@ function CreateProject({ onClose }) {
       zIndex: 2000
     },
     modal: {
-      // GRADIENT CONTAINER - matching Login.js
       background: 'linear-gradient(135deg, rgba(42, 46, 57, 0.95) 0%, rgba(28, 31, 38, 0.98) 50%, rgba(20, 22, 28, 1) 100%)',
       backdropFilter: 'blur(20px)',
       borderRadius: '16px',
@@ -493,11 +525,12 @@ function CreateProject({ onClose }) {
       border: '1px solid rgba(255, 255, 255, 0.2)',
       borderRadius: '8px',
       fontSize: '14px',
-      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      backgroundColor: '#1a1c20',
       color: 'white',
       backdropFilter: 'blur(8px)',
       outline: 'none',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      cursor: 'pointer'
     },
     buttonContainer: {
       display: 'flex',
@@ -669,7 +702,8 @@ function CreateProject({ onClose }) {
     characterCount: {
       fontSize: '12px',
       color: '#6b7280',
-      marginTop: '6px'
+      marginTop: '6px',
+      transition: 'color 0.3s ease'
     }
   };
 
@@ -707,11 +741,57 @@ function CreateProject({ onClose }) {
     }
   `;
 
+  // DROPDOWN FIX STYLES
+  const dropdownFixStyles = `
+    /* Fixed dropdown styling for dark theme */
+    select {
+      background-color: #1a1c20 !important;
+      color: white !important;
+    }
+    
+    select option {
+      background-color: #1a1c20 !important;
+      color: #e2e8f0 !important;
+      padding: 10px 12px !important;
+    }
+    
+    select option:hover {
+      background-color: #2563eb !important;
+      color: white !important;
+    }
+    
+    select option:checked {
+      background-color: #3b82f6 !important;
+      color: white !important;
+      font-weight: 600;
+    }
+    
+    /* Firefox specific */
+    select {
+      color-scheme: dark;
+    }
+    
+    /* Better scrollbar for dropdowns */
+    select::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    select::-webkit-scrollbar-track {
+      background: #0d1117;
+    }
+    
+    select::-webkit-scrollbar-thumb {
+      background: #3b82f6;
+      border-radius: 4px;
+    }
+  `;
+
   // Step 1: Basic Information
   if (currentStep === 1) {
     return (
       <>
         <style>{scrollbarStyles}</style>
+        <style>{dropdownFixStyles}</style>
         <div style={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
           <div style={styles.modal} className="custom-scrollbar">
             <button 
@@ -786,48 +866,131 @@ function CreateProject({ onClose }) {
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Short Description *</label>
                 <textarea
-                  style={styles.textarea}
+                  style={{
+                    ...styles.textarea,
+                    ...getInputBorderStyle('description', formData.description)
+                  }}
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="Provide a brief overview of your project (2-3 sentences)"
                   maxLength="500"
                   className="custom-scrollbar"
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3b82f6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                    if (!validationErrors.description) {
+                      e.target.style.borderColor = '#3b82f6';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                    }
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                    e.target.style.boxShadow = 'none';
+                    if (!validationErrors.description) {
+                      e.target.style.borderColor = getInputBorderStyle('description', formData.description).border.includes('#ef4444') 
+                        ? '#ef4444' 
+                        : 'rgba(255, 255, 255, 0.2)';
+                      e.target.style.boxShadow = 'none';
+                    }
                   }}
                 />
-                <div style={styles.characterCount}>
-                  {formData.description.length}/500 characters
-                  Please input atleast 10 characters minimum.
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '8px'
+                }}>
+                  <div style={{
+                    ...styles.characterCount,
+                    color: validationErrors.description ? '#ef4444' : '#6b7280',
+                    fontWeight: validationErrors.description ? '600' : '400',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    {validationErrors.description ? (
+                      <>
+                        <span>⚠️</span>
+                        {validationErrors.description}
+                      </>
+                    ) : (
+                      `${formData.description.length}/500 characters`
+                    )}
+                  </div>
+                  {formData.description.trim().length === 0 && (
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#9ca3af',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <span style={{ fontSize: '10px' }}>ℹ️</span>
+                      Minimum 10 characters
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Detailed Description</label>
                 <textarea
-                  style={{...styles.textarea, minHeight: '150px'}}
+                  style={{
+                    ...styles.textarea,
+                    minHeight: '150px',
+                    ...getInputBorderStyle('detailed_description', formData.detailed_description)
+                  }}
                   value={formData.detailed_description}
                   onChange={(e) => handleInputChange('detailed_description', e.target.value)}
                   placeholder="Provide more details about your project goals, features, and requirements"
                   maxLength="2000"
                   className="custom-scrollbar"
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3b82f6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                    if (!validationErrors.detailed_description) {
+                      e.target.style.borderColor = '#3b82f6';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                    }
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                    e.target.style.boxShadow = 'none';
+                    if (!validationErrors.detailed_description) {
+                      e.target.style.borderColor = getInputBorderStyle('detailed_description', formData.detailed_description).border.includes('#ef4444') 
+                        ? '#ef4444' 
+                        : 'rgba(255, 255, 255, 0.2)';
+                      e.target.style.boxShadow = 'none';
+                    }
                   }}
                 />
-                <div style={styles.characterCount}>
-                  {formData.detailed_description.length}/2000 characters
-                  Please input atleast 10 characters minimum.
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '8px'
+                }}>
+                  <div style={{
+                    ...styles.characterCount,
+                    color: validationErrors.detailed_description ? '#ef4444' : '#6b7280',
+                    fontWeight: validationErrors.detailed_description ? '600' : '400',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    {validationErrors.detailed_description ? (
+                      <>
+                        <span>⚠️</span>
+                        {validationErrors.detailed_description}
+                      </>
+                    ) : (
+                      `${formData.detailed_description.length}/2000 characters`
+                    )}
+                  </div>
+                  {formData.detailed_description.trim().length === 0 && (
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#9ca3af',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <span style={{ fontSize: '10px' }}>ℹ️</span>
+                      Minimum 10 characters
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -851,10 +1014,10 @@ function CreateProject({ onClose }) {
                 style={{
                   ...styles.button,
                   ...styles.primaryButton,
-                  ...((!formData.title.trim() || !formData.description.trim()) ? styles.disabledButton : {})
+                  ...((!formData.title.trim() || !formData.description.trim() || validationErrors.description || validationErrors.detailed_description) ? styles.disabledButton : {})
                 }}
                 onClick={handleNext}
-                disabled={!formData.title.trim() || !formData.description.trim()}
+                disabled={!formData.title.trim() || !formData.description.trim() || validationErrors.description || validationErrors.detailed_description}
                 onMouseEnter={(e) => {
                   if (!e.target.disabled) {
                     e.target.style.transform = 'translateY(-2px)';
@@ -882,6 +1045,7 @@ function CreateProject({ onClose }) {
     return (
       <>
         <style>{scrollbarStyles}</style>
+        <style>{dropdownFixStyles}</style>
         <div style={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
           <div style={styles.modal} className="custom-scrollbar">
             <button 
@@ -1125,6 +1289,7 @@ function CreateProject({ onClose }) {
     return (
       <>
         <style>{scrollbarStyles}</style>
+        <style>{dropdownFixStyles}</style>
         <div style={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
           <div style={styles.modal} className="custom-scrollbar">
             <button 
